@@ -1,4 +1,4 @@
-# Sign-In Application v4.0 - Professional Documentation
+# Sign-In Application v4.2 - Professional Documentation
 
 ## Table of Contents
 1. Overview
@@ -8,7 +8,7 @@
 5. Core Functionality & Safeguards
 6. Administrative Features & Customization
 7. Visual Color Coding & High-Contrast Text
-8. Data Management & File Layouts (Cast, Roles, Locations, Warehouse)
+8. Data Management & File Layouts (Cast, Roles, Locations, Warehouse, Meeting)
 9. Special Input Codes
 10. Log Retention & Maintenance
 11. Troubleshooting
@@ -18,7 +18,7 @@
 
 ## 1. Overview
 
-Sign-In v4.0 is a robust digital attendance system designed for professional environments like theatre companies and offices. It features real-time tracking, full offline persistence, automated data management via synced Excel files, custom theme color engine, and robust sign-in safeguards.
+Sign-In v4.2 is a robust digital attendance system designed for professional environments like theatre companies and offices. It features real-time tracking, full offline persistence, automated data management via synced Excel files, custom theme color engine, Warehouse 3-step cycle mode, separate remote-controlled Meeting timers for Theatre (cell B17) and Warehouse (cell B18), 30-day strict retention, UK datestamped 24-hr record saves, and robust sign-in safeguards.
 
 ---
 
@@ -40,11 +40,11 @@ Sign-In v4.0 is a robust digital attendance system designed for professional env
 - **Restricted Settings Override**: On Android 11+ tablets where the permission switch appears grayed out or disabled:
   1. Tap the **three dots (`⋮`)** at the top right corner of the Android settings screen.
   2. Select **"Allow restricted settings"**.
-  3. Return to the settings page and enable the permission toggle for Sign-In v4.0.
+  3. Return to the settings page and enable the permission toggle for Sign-In v4.2.
 
 ### Tablet Auto-Restart & Battery Optimization Note
 - On certain tablets (Samsung, Lenovo, etc.), OEM background process managers may terminate apps launched automatically via boot receivers. 
-- **Action**: Go to **Settings > Apps > Sign-In v4.0 > Battery**, set it to **"Unrestricted"**, and enable **Auto-start / Allow background activity** in device settings.
+- **Action**: Go to **Settings > Apps > Sign-In v4.2 > Battery**, set it to **"Unrestricted"**, and enable **Auto-start / Allow background activity** in device settings.
 
 ---
 
@@ -52,6 +52,8 @@ Sign-In v4.0 is a robust digital attendance system designed for professional env
 - **Header**: Minimalist design with top corners left empty. 
 - **Dual Panels**: Visitors/Members on the Left, Cast list on the Right.
 - **Instruction Block**: Simplified sign-in and sign-out guidance.
+- **Next Sync Indicator**: Discreet timestamp positioned safely below the system status bar (`padding(top = 45.dp, end = 12.dp)`), displaying **"Next Sync: [HH:mm]"** at 11.sp font size.
+- **Admin Indicators**: Clean remote-status indicators (Theatre duration loaded from cell B17 and Warehouse duration from cell B18).
 
 ---
 
@@ -72,6 +74,12 @@ Sign-In v4.0 is a robust digital attendance system designed for professional env
 - Go to **Admin > Appearance**, tap **Click to change** on the right of the tile, and use the built-in **RGB Color Sliders** engine to choose any custom theme color.
 - **Automatic High-Contrast Text**: Text elements (headers, titles, instructions) automatically switch to crisp white on dark backgrounds and black on light backgrounds based on perceptual luminance.
 
+### 6.2 Modes (Warehouse Enable & Meeting Mode)
+- In Admin under **Modes**, toggle **Warehouse Enable** or **Meeting Mode** (mutually exclusive).
+- **Warehouse 3-Step Button Cycle**: Cycles through **GPT** (0) ➔ **YT** (1) ➔ **Meeting** (2, displaying meeting icon and bright blue background).
+- **Meeting Mode & Remote Durations (Cells B17 & B18)**: Theatre meeting duration (`1-24` hours) is controlled remotely by cell **B17**, and Warehouse meeting duration (`1-24` hours) is controlled remotely by cell **B18** in the Questions Excel file. Both values are visibly displayed as unchangeable read-only status indicators on the Admin screen. Meeting mode automatically deactivates after the respective configured hours have elapsed since activation.
+- **"Signed in Cast Member is King"**: If any cast member is checked in (`stageActive`), the Meeting button is automatically disabled in both modes.
+
 ---
 
 ## 7. Visual Color Coding
@@ -84,7 +92,7 @@ Sign-In v4.0 is a robust digital attendance system designed for professional env
 
 ## 8. Data Management & File Layouts
 
-All files must be in Excel (`.xlsx`) format.
+All files must be in Excel (`.xlsx`) format. In Admin, files are uploaded via 3 large, equal-width buttons: **"Cast"**, **"Members"**, and **"In App Lists"**.
 
 ### Cast File (RH Side)
 - **Row 1**: Play Title.
@@ -96,14 +104,27 @@ All files must be in Excel (`.xlsx`) format.
 - **Column B**: Last Name.
 *(The app automatically sorts members alphabetically and computes the dynamic midpoint split letter for Dark mode panels).*
 
-### Roles & Locations Files
-- **Column A**: Role or Location names (Row 2+).
+### In App Lists File (Single Combined Workbook with 4 Worksheets)
+- **Locations Worksheet**:
+  - **Cell A1**: Inputbox Label.
+  - **Cells A2:A20**: Theatre Locations.
+  - **Cells A21:A30**: Warehouse Locations.
+- **Roles Worksheet**:
+  - **Cell A1**: Inputbox Label.
+  - **Cells A2:A20**: Theatre Roles.
+  - **Cells A21:A30**: Warehouse Roles.
+- **Questions Worksheet** *(No header row)*:
+  - **Cells B1–B14**: Last Person Sign-Out Checklist Text (up to 14 checklist questions).
+  - **Cells B15–B16**: Reminder Pop-Up Message (Line 1 = B15, Line 2 = B16).
+  - **Cell B17**: Theatre Meeting Duration hours (`1–24`).
+  - **Cell B18**: Warehouse Meeting Duration hours (`1–24`).
+- **Titles Worksheet**:
+  - **Cell B2**: Default Play Title / Main Screen Header.
+  - **Cell B3**: Left Panel Heading.
+  - **Cell B4**: Right Panel Heading.
+  - **Cell B5**: Screen Saver Message.
 
-### Titles & Questions Files
-- **Column B**: Configuration rows.
-
-### Warehouse Mode
-- When Warehouse Mode is enabled in Admin, the app switches to Warehouse worksheets and enables the `GPT` / `YT` toggle button on the sign-in form.
+*When "In App Lists" is updated, change detection reloads all 4 worksheets simultaneously and logs an Admin Event reporting the worksheet change.*
 
 ---
 
@@ -116,19 +137,17 @@ Entered into the **Name** input box:
 ---
 
 ## 10. Log Retention & Maintenance
-## 10. Log Retention & Maintenance
-- **Admin Logs**: Retained for **30 days** (older text log files are automatically pruned).
-- **Sign-In History & Records**: Retained for **60–90 days** in local storage and daily backups.
+- **Log Save Folder & Single Daily Record Updates**: Designated under **Log Save Folder (Saved every 4 hours)**. The app creates exactly **one record file per day** (`Records_YYYY-MM-DD.txt`) in the Records subfolder. When background auto-saves run every 4 hours, that single daily file is updated in place with all sign-ins and sign-outs for the day (previous 24 hours), complete with an explicit UK datestamp (`dd-MM-yyyy`) on every record row. This prevents duplicate numbered files (`Records_... (1).txt`).
+- **Admin Logs & Sign-In History Retention**: Retained for **30 days** (older text log files and daily records are automatically pruned). Admin logs record **only** PIN changes and actual database/file updates.
 - **Storage Consumption**: Extremely lightweight, consuming **less than 20 MB total**.
-
-### 10.1 FAQ: What happens if the Admin log save folder is not selected?
-If the Admin log save folder is not selected, **core sign-in functionality, database loading/saving, and local in-app history continue to operate normally**. The app simply skips writing external text log files and daily CSV/Excel export files to disk until a folder is designated in Admin settings.
+- **Unselected Log Folder Behavior**: If no log save folder is selected in Admin, core sign-in, database loading/saving, and local history operate normally; external text log files and daily export files are simply skipped until a folder is designated.
 
 ---
 
 ## 11. Technical Specifications
 - **Framework**: Kotlin / Jetpack Compose.
-- **Versioning**: v4.0 - September 2026 Release.
+- **Versioning**: v4.2 - October 2026 Release.
 - **Storage**: Full JSON local persistence for all databases.
 - **Excel Library**: Apache POI.
-- **Background Work**: Android WorkManager for hourly refreshes and daily maintenance at 04:00 AM.
+- **Background Work**: Android WorkManager for 4-hour refreshes/saves and daily maintenance at 04:00 AM.
+- **Admin Footer Branding**: Created by Stu Sorrell, v4.2.2026.10

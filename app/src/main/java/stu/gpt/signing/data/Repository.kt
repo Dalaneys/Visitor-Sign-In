@@ -36,10 +36,12 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import kotlinx.coroutines.*
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 
 object Repository {
-    const val VERSION = "v4.0"
+    const val VERSION = "v4.2"
     private lateinit var appContext: Context
     private val repositoryScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private const val PREFS_NAME = "signing_prefs"
@@ -79,6 +81,11 @@ object Repository {
     private const val KEY_QUESTION_RELATIVE_PATH = "questionRelativePath"
     private const val KEY_TITLES_DISPLAY_NAME = "titlesDisplayName"
     private const val KEY_TITLES_RELATIVE_PATH = "titlesRelativePath"
+    private const val KEY_MEETING_MODE = "meetingModeEnabled"
+    private const val KEY_MEETING_ACTIVE = "meetingButtonActive"
+    private const val KEY_THEATRE_MEETING_DURATION = "theatreMeetingDurationHours"
+    private const val KEY_WAREHOUSE_MEETING_DURATION = "warehouseMeetingDurationHours"
+    private const val KEY_MEETING_ACTIVATED_TIMESTAMP = "meetingActivatedTimestamp"
     private const val KEY_REGULAR_LIST_LAST_MODIFIED = "regularListLastModifiedMillis"
     private const val KEY_NAMES_CREATED = "namesCreatedMillis"
     private const val KEY_NAMES_LAST_MODIFIED = "namesLastModifiedMillis"
@@ -102,6 +109,24 @@ object Repository {
     private const val KEY_HASH_REGULAR_LIST_1000 = "regularListFirst1000Hash"
     private const val KEY_HASH_QUESTION_1000 = "questionFirst1000Hash"
     private const val KEY_HASH_TITLES_1000 = "titlesFirst1000Hash"
+    private const val KEY_HASH_REFERENCE_DATA_1000 = "referenceDataFirst1000Hash"
+    private const val KEY_HASH_IN_APP_LISTS_1000 = "inAppListsFirst1000Hash"
+    private const val KEY_URI_REFERENCE_DATA = "referenceDataUriString"
+    private const val KEY_URI_IN_APP_LISTS = "inAppListsUriString"
+    private const val KEY_REFERENCE_DATA_DISPLAY_NAME = "referenceDataDisplayName"
+    private const val KEY_IN_APP_LISTS_DISPLAY_NAME = "inAppListsDisplayName"
+    private const val KEY_REFERENCE_DATA_RELATIVE_PATH = "referenceDataRelativePath"
+    private const val KEY_IN_APP_LISTS_RELATIVE_PATH = "inAppListsRelativePath"
+    private const val KEY_ID_REFERENCE_DATA = "referenceDataMediaStoreId"
+    private const val KEY_ID_IN_APP_LISTS = "inAppListsMediaStoreId"
+    private const val KEY_NEEDS_REGRANT_REFERENCE_DATA = "referenceDataNeedsRegrant"
+    private const val KEY_NEEDS_REGRANT_IN_APP_LISTS = "inAppListsNeedsRegrant"
+    private const val KEY_REFERENCE_DATA_CREATED = "referenceDataCreatedMillis"
+    private const val KEY_IN_APP_LISTS_CREATED = "inAppListsCreatedMillis"
+    private const val KEY_REFERENCE_DATA_LAST_MODIFIED = "referenceDataLastModifiedMillis"
+    private const val KEY_IN_APP_LISTS_LAST_MODIFIED = "inAppListsLastModifiedMillis"
+    private const val KEY_SIZE_REFERENCE_DATA = "referenceDataSize"
+    private const val KEY_SIZE_IN_APP_LISTS = "inAppListsSize"
     private const val KEY_LAST_SYNC_TIME = "lastSyncTime"
     private const val KEY_ID_NAMES = "namesMediaStoreId"
     private const val KEY_ID_ROLES = "rolesMediaStoreId"
@@ -129,7 +154,7 @@ object Repository {
     private const val KEY_LOG_FOLDER_DISPLAY_NAME = "logFolderDisplayName"
     private const val KEY_LOG_FOLDER_RELATIVE_PATH = "logFolderRelativePath"
     private const val KEY_WAREHOUSE_MODE_ENABLED = "warehouseModeEnabled"
-    private const val KEY_IS_WAREHOUSE_ACTIVE = "isWarehouseActive"
+    private const val KEY_WAREHOUSE_STATE = "warehouseState"
 
     // Settings (in-memory for now; can be persisted with DataStore later)
     var settings by mutableStateOf(AppSettings())
@@ -196,7 +221,8 @@ object Repository {
                 // Load settings from SharedPreferences
                 loadSettings()
                 
-                logAdminEvent("App initialized")
+                // Check if meeting mode duration has expired since activation
+                checkAndApplyMeetingTimeout()
 
                 // Force a full refresh once if version has changed (app update)
                 if (settings.lastUsedVersion != VERSION) {
@@ -248,6 +274,16 @@ object Repository {
                         questionLines.addAll(lines)
                     }
                 }
+                runCatching {
+                    val b17 = readCellB17(settings.questionUriString)
+                    val b18 = readCellB18(settings.questionUriString)
+                    if (b17 != null || b18 != null) {
+                        updateSettings { it.copy(
+                            theatreMeetingDurationHours = b17 ?: it.theatreMeetingDurationHours,
+                            warehouseMeetingDurationHours = b18 ?: it.warehouseMeetingDurationHours
+                        ) }
+                    }
+                }
                 
                 // Load regular list active/tapped state and vehicle regs if available
                 runCatching { Storage.loadRegularListState(appContext) }.getOrNull()?.let { st ->
@@ -263,8 +299,8 @@ object Repository {
                 withContext(Dispatchers.Main) {
                     history.clear()
                     history.addAll(loaded)
-                    // Enforce retention at startup (90 days)
-                    pruneHistoryOlderThan(days = 90L)
+                    // Enforce retention at startup (30 days)
+                    pruneHistoryOlderThan(days = 30L)
                 }
                 saveHistory()
 
@@ -358,13 +394,19 @@ object Repository {
                     oldSettings.regularListUriString != settings.regularListUriString ||
                     oldSettings.questionUriString != settings.questionUriString ||
                     oldSettings.titlesUriString != settings.titlesUriString ||
+                    oldSettings.referenceDataUriString != settings.referenceDataUriString ||
+                    oldSettings.inAppListsUriString != settings.inAppListsUriString ||
                     oldSettings.logFolderUriString != settings.logFolderUriString ||
                     oldSettings.vehicleRegPromptEnabled != settings.vehicleRegPromptEnabled ||
                     oldSettings.carRegReminderEnabled != settings.carRegReminderEnabled ||
                     oldSettings.carRegReminderDuration != settings.carRegReminderDuration ||
                     oldSettings.screenSaverEnabled != settings.screenSaverEnabled ||
                     oldSettings.warehouseModeEnabled != settings.warehouseModeEnabled ||
-                    oldSettings.isWarehouseActive != settings.isWarehouseActive
+                    oldSettings.warehouseState != settings.warehouseState
+
+            if (oldSettings.warehouseModeEnabled != settings.warehouseModeEnabled) {
+                updateActiveRolesAndLocations()
+            }
 
             if (importantChange && oldPin == settings.pin) {
                 logAdminEvent("Admin settings saved")
@@ -472,7 +514,7 @@ object Repository {
     }
 
     /**
-     * Saves the current sign-in history to a daily record file in a "Records" subfolder.
+     * Saves sign-in records for that day (previous 24hrs) to a daily record file in a "Records" subfolder.
      */
     fun saveDailyRecordFile() {
         if (!::appContext.isInitialized) return
@@ -506,23 +548,89 @@ object Repository {
 
                 if (recordsFolderUri == null) return@launch
 
-                // 2. Create the daily record file
+                // 2. Find or create single daily record file for today
                 val now = java.time.LocalDateTime.now()
                 val fileName = "Records_${now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))}.txt"
-                val recordFileUri = DocumentsContract.createDocument(appContext.contentResolver, recordsFolderUri!!, "text/plain", fileName) ?: return@launch
+                
+                var existingRecordFileUri: android.net.Uri? = null
+                val recordsFolderDocId = DocumentsContract.getDocumentId(recordsFolderUri!!)
+                val recordsChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, recordsFolderDocId)
 
-                val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(java.time.ZoneId.systemDefault())
+                appContext.contentResolver.query(
+                    recordsChildrenUri,
+                    arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                    null, null, null
+                )?.use { cursor ->
+                    val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                    val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                    while (cursor.moveToNext()) {
+                        val dispName = cursor.getString(nameCol)
+                        if (dispName == fileName) {
+                            val docId = cursor.getString(idCol)
+                            existingRecordFileUri = DocumentsContract.buildDocumentUriUsingTree(parentUri, docId)
+                            break
+                        }
+                    }
+                }
+
+                val recordFileUri = existingRecordFileUri ?: DocumentsContract.createDocument(
+                    appContext.contentResolver,
+                    recordsFolderUri!!,
+                    "text/plain",
+                    fileName
+                ) ?: return@launch
+
+                // Filter history to only include records from the previous 24 hours (that day)
+                val cutoff24h = System.currentTimeMillis() - 24L * 3600L * 1000L
+                val historyRecords = history.filter { e ->
+                    e.arrivalEpochMillis >= cutoff24h || e.departureEpochMillis >= cutoff24h
+                }
+
+                // Currently active visitor sign-ins
+                val activeVisitorRecords = visitors.map { v ->
+                    HistoryEntry(
+                        name = v.name,
+                        roleOrLocation = v.roleOrLocation,
+                        arrivalEpochMillis = v.arrivalEpochMillis,
+                        departureEpochMillis = 0L,
+                        vehicleReg = v.vehicleReg
+                    )
+                }
+
+                // Currently active cast sign-ins
+                val activeCastRecords = stageActive.map { (name, startTime) ->
+                    HistoryEntry(
+                        name = name,
+                        roleOrLocation = settings.rightHeading.ifBlank { "Cast" },
+                        arrivalEpochMillis = startTime,
+                        departureEpochMillis = 0L,
+                        vehicleReg = stageVehicleReg[name]
+                    )
+                }
+
+                // Combine active records and history records, sorted by arrival time
+                val allDayRecords = (activeVisitorRecords + activeCastRecords + historyRecords)
+                    .sortedBy { it.arrivalEpochMillis }
+
                 val content = buildString {
-                    append("Sign-In Records for ${now.toLocalDate()}\n")
-                    append("Generated at: ${now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))}\n")
-                    append("-".repeat(50) + "\n")
-                    append(String.format("%-25s %-20s %-15s %-15s %-15s\n", "Name", "Role/Loc", "In", "Out", "Reg"))
-                    history.forEach { e ->
-                        append(String.format("%-25s %-20s %-15s %-15s %-15s\n",
+                    append("Sign-In Records for ${now.toLocalDate().format(DateTimeFormatter.ofPattern("dd-MM-yyyy"))} (Real-Time Daily Record)\n")
+                    append("Generated at: ${now.format(DateTimeFormatter.ofPattern("HH:mm:ss"))}\n")
+                    append("-".repeat(67) + "\n")
+                    append(String.format("%-25s %-20s %-12s %-8s %-10s %-12s\n", "Name", "Role/Loc", "Date", "In", "Out", "Reg"))
+                    allDayRecords.forEach { e ->
+                        val arrivalDt = LocalDateTime.ofInstant(Instant.ofEpochMilli(e.arrivalEpochMillis), ZoneId.systemDefault())
+                        val outStr = if (e.departureEpochMillis > 0L) {
+                            val departureDt = LocalDateTime.ofInstant(Instant.ofEpochMilli(e.departureEpochMillis), ZoneId.systemDefault())
+                            departureDt.format(DateTimeFormatter.ofPattern("HH:mm"))
+                        } else {
+                            "(On-Site)"
+                        }
+                        append(String.format("%-25s %-20s %-12s %-8s %-10s %-12s\n",
                             e.name.take(24),
                             e.roleOrLocation.take(19),
-                            formatter.format(java.time.Instant.ofEpochMilli(e.arrivalEpochMillis)).substringAfter(" "),
-                            formatter.format(java.time.Instant.ofEpochMilli(e.departureEpochMillis)).substringAfter(" "),
+                            arrivalDt.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")),
+                            arrivalDt.format(DateTimeFormatter.ofPattern("HH:mm")),
+                            outStr,
                             e.vehicleReg ?: ""
                         ))
                     }
@@ -531,7 +639,7 @@ object Repository {
                 appContext.contentResolver.openOutputStream(recordFileUri, "wt")?.use { out ->
                     out.bufferedWriter().use { it.write(content) }
                 }
-                Log.d("Repository", "Daily record saved: $fileName")
+                Log.d("Repository", "Daily record updated in real-time: $fileName (${allDayRecords.size} total records)")
             } catch (e: Exception) {
                 Log.e("Repository", "Failed to save daily record: ${e.message}", e)
             }
@@ -539,17 +647,17 @@ object Repository {
     }
 
     /**
-     * Prunes record files in the "Records" subfolder older than 60 days.
+     * Prunes record files in the "Records" subfolder older than 30 days.
      */
-    fun pruneDailyRecordsOlderThan60Days() {
+    fun pruneDailyRecordsOlderThan30Days() {
         if (!::appContext.isInitialized) return
         val uriStr = settings.logFolderUriString ?: return
         
-        val now = java.time.LocalDate.now()
-        val sixtyDaysAgo = now.minusDays(60)
+        val now = LocalDate.now()
+        val thirtyDaysAgo = now.minusDays(30)
 
         try {
-            val parentUri = android.net.Uri.parse(uriStr)
+            val parentUri = Uri.parse(uriStr)
             val parentId = DocumentsContract.getTreeDocumentId(parentUri)
             
             // Find "Records" folder ID
@@ -576,10 +684,10 @@ object Repository {
                 while (cursor.moveToNext()) {
                     val name = cursor.getString(nameCol) ?: continue
                     if (name.startsWith("Records_") && name.endsWith(".txt")) {
-                        val dateStr = name.substringAfter("Records_").substringBefore(".txt")
+                        val dateStr = name.substringAfter("Records_").substringBefore(" ").substringBefore(".txt")
                         runCatching {
                             val fileDate = java.time.LocalDate.parse(dateStr)
-                            if (fileDate.isBefore(sixtyDaysAgo)) {
+                            if (fileDate.isBefore(thirtyDaysAgo)) {
                                 val docId = cursor.getString(idCol)
                                 val fileUri = DocumentsContract.buildDocumentUriUsingTree(parentUri, docId)
                                 DocumentsContract.deleteDocument(appContext.contentResolver, fileUri)
@@ -625,6 +733,7 @@ object Repository {
         visitors.add(VisitorEntry(finalName, col, Instant.now().toEpochMilli(), vehicleReg?.take(20)))
         resortVisitors()
         if (::appContext.isInitialized) Storage.saveVisitors(appContext, visitors)
+        saveDailyRecordFile()
     }
 
     private fun resortVisitors() {
@@ -655,8 +764,8 @@ object Repository {
                 vehicleReg = entry.vehicleReg
             )
         )
-        // Enforce retention and persist (90 days)
-        pruneHistoryOlderThan(days = 90L)
+        // Enforce retention and persist (30 days)
+        pruneHistoryOlderThan(days = 30L)
         saveHistory()
         if (visitors.isEmpty() && stageActive.isEmpty()) {
             updateSettings { it.copy(lastSignOutTime = Instant.now().toEpochMilli()) }
@@ -681,7 +790,7 @@ object Repository {
         }
         visitors.clear()
         history.addAll(toArchive)
-        pruneHistoryOlderThan(days = 90L)
+        pruneHistoryOlderThan(days = 30L)
         saveHistory()
         updateSettings { it.copy(lastSignOutTime = Instant.now().toEpochMilli()) }
         if (::appContext.isInitialized) Storage.saveVisitors(appContext, visitors)
@@ -710,14 +819,13 @@ object Repository {
     }
     fun loadQuestionLines(items: List<String>) {
         // items is Column B of Questions file
-        // Row 1 (index 0) is Header
-        // Rows 2-14 (indices 1-13) are Question checklist items
-        // Row 15 (index 14) is Car Reg Line 1
-        // Row 16 (index 15) is Car Reg Line 2
+        // Cells B1-B14 (indices 0-13) are Question checklist items (no header row)
+        // Cell B15 (index 14) is Car Reg Line 1
+        // Cell B16 (index 15) is Car Reg Line 2
         
-        // Checklist items (max 13 items)
-        val qLines = if (items.size > 1) {
-            items.subList(1, minOf(items.size, 14)).filter { it.isNotBlank() }
+        // Checklist items (Cells B1 to B14, max 14 items)
+        val qLines = if (items.isNotEmpty()) {
+            items.subList(0, minOf(items.size, 14)).filter { it.isNotBlank() }
         } else emptyList()
         
         val carRegL1 = items.getOrNull(14)?.ifBlank { "CAR REG?" } ?: "CAR REG?"
@@ -823,6 +931,7 @@ object Repository {
             }
         }
         if (::appContext.isInitialized) Storage.saveRegularListState(appContext, stageActive, stageTappedAt, stageVehicleReg)
+        saveDailyRecordFile()
     }
 
     /**
@@ -830,7 +939,6 @@ object Repository {
      */
     fun regularListSignOutAllNow() {
         if (stageActive.isEmpty()) return
-        logAdminEvent("Sign-out All Cast triggered")
         val now = Instant.now().toEpochMilli()
         val toArchive = stageActive.map { (name, start) ->
             HistoryEntry(
@@ -843,7 +951,7 @@ object Repository {
         stageActive.clear()
         stageTappedAt.clear()
         history.addAll(toArchive)
-        pruneHistoryOlderThan(days = 90L)
+        pruneHistoryOlderThan(days = 30L)
         saveHistory()
         updateSettings { it.copy(lastSignOutTime = Instant.now().toEpochMilli()) }
         if (::appContext.isInitialized) Storage.saveRegularListState(appContext, stageActive, stageTappedAt, stageVehicleReg)
@@ -888,6 +996,7 @@ object Repository {
     private fun saveHistory() {
         if (::appContext.isInitialized) {
             Storage.saveHistory(appContext, history)
+            saveDailyRecordFile()
         }
     }
 
@@ -1123,6 +1232,24 @@ object Repository {
             regularListFirst1000Hash = prefs.getString(KEY_HASH_REGULAR_LIST_1000, null),
             questionFirst1000Hash = prefs.getString(KEY_HASH_QUESTION_1000, null),
             titlesFirst1000Hash = prefs.getString(KEY_HASH_TITLES_1000, null),
+            referenceDataFirst1000Hash = prefs.getString(KEY_HASH_REFERENCE_DATA_1000, null),
+            inAppListsFirst1000Hash = prefs.getString(KEY_HASH_IN_APP_LISTS_1000, null),
+            referenceDataUriString = prefs.getString(KEY_URI_REFERENCE_DATA, null) ?: prefs.getString(KEY_URI_IN_APP_LISTS, null),
+            inAppListsUriString = prefs.getString(KEY_URI_IN_APP_LISTS, null) ?: prefs.getString(KEY_URI_REFERENCE_DATA, null),
+            referenceDataDisplayName = prefs.getString(KEY_REFERENCE_DATA_DISPLAY_NAME, null) ?: prefs.getString(KEY_IN_APP_LISTS_DISPLAY_NAME, null),
+            inAppListsDisplayName = prefs.getString(KEY_IN_APP_LISTS_DISPLAY_NAME, null) ?: prefs.getString(KEY_REFERENCE_DATA_DISPLAY_NAME, null),
+            referenceDataRelativePath = prefs.getString(KEY_REFERENCE_DATA_RELATIVE_PATH, null) ?: prefs.getString(KEY_IN_APP_LISTS_RELATIVE_PATH, null),
+            inAppListsRelativePath = prefs.getString(KEY_IN_APP_LISTS_RELATIVE_PATH, null) ?: prefs.getString(KEY_REFERENCE_DATA_RELATIVE_PATH, null),
+            referenceDataMediaStoreId = prefs.getLong(KEY_ID_REFERENCE_DATA, -1L).let { if (it >= 0) it else null },
+            inAppListsMediaStoreId = prefs.getLong(KEY_ID_IN_APP_LISTS, -1L).let { if (it >= 0) it else null },
+            referenceDataNeedsRegrant = prefs.getBoolean(KEY_NEEDS_REGRANT_REFERENCE_DATA, false),
+            inAppListsNeedsRegrant = prefs.getBoolean(KEY_NEEDS_REGRANT_IN_APP_LISTS, false),
+            referenceDataCreatedMillis = prefs.getLong(KEY_REFERENCE_DATA_CREATED, -1L).let { if (it >= 0) it else null },
+            inAppListsCreatedMillis = prefs.getLong(KEY_IN_APP_LISTS_CREATED, -1L).let { if (it >= 0) it else null },
+            referenceDataLastModifiedMillis = prefs.getLong(KEY_REFERENCE_DATA_LAST_MODIFIED, -1L).let { if (it >= 0) it else null },
+            inAppListsLastModifiedMillis = prefs.getLong(KEY_IN_APP_LISTS_LAST_MODIFIED, -1L).let { if (it >= 0) it else null },
+            referenceDataSize = prefs.getLong(KEY_SIZE_REFERENCE_DATA, -1L).let { if (it >= 0) it else null },
+            inAppListsSize = prefs.getLong(KEY_SIZE_IN_APP_LISTS, -1L).let { if (it >= 0) it else null },
             lastSyncTime = prefs.getLong(KEY_LAST_SYNC_TIME, 0L),
             vehicleRegPromptEnabled = prefs.getBoolean(KEY_VEHICLE_REG_PROMPT_ENABLED, false),
             carRegReminderEnabled = prefs.getBoolean(KEY_CAR_REG_REMINDER_ENABLED, true),
@@ -1134,7 +1261,10 @@ object Repository {
             logFolderDisplayName = prefs.getString(KEY_LOG_FOLDER_DISPLAY_NAME, null),
             logFolderRelativePath = prefs.getString(KEY_LOG_FOLDER_RELATIVE_PATH, null),
             warehouseModeEnabled = prefs.getBoolean(KEY_WAREHOUSE_MODE_ENABLED, false),
-            isWarehouseActive = prefs.getBoolean(KEY_IS_WAREHOUSE_ACTIVE, false)
+            warehouseState = prefs.getInt(KEY_WAREHOUSE_STATE, 0),
+            theatreMeetingDurationHours = prefs.getInt(KEY_THEATRE_MEETING_DURATION, 3),
+            warehouseMeetingDurationHours = prefs.getInt(KEY_WAREHOUSE_MEETING_DURATION, 3),
+            meetingActivatedTimestamp = prefs.getLong(KEY_MEETING_ACTIVATED_TIMESTAMP, 0L)
         )
         settings = loaded
         // Persist migrated value if we used the legacy key
@@ -1186,7 +1316,12 @@ object Repository {
             .putString(KEY_LOG_FOLDER_DISPLAY_NAME, settings.logFolderDisplayName)
             .putString(KEY_LOG_FOLDER_RELATIVE_PATH, settings.logFolderRelativePath)
             .putBoolean(KEY_WAREHOUSE_MODE_ENABLED, settings.warehouseModeEnabled)
-            .putBoolean(KEY_IS_WAREHOUSE_ACTIVE, settings.isWarehouseActive)
+            .putInt(KEY_WAREHOUSE_STATE, settings.warehouseState)
+            .putBoolean(KEY_MEETING_MODE, settings.meetingModeEnabled)
+            .putBoolean(KEY_MEETING_ACTIVE, settings.meetingButtonActive)
+            .putInt(KEY_THEATRE_MEETING_DURATION, settings.theatreMeetingDurationHours)
+            .putInt(KEY_WAREHOUSE_MEETING_DURATION, settings.warehouseMeetingDurationHours)
+            .putLong(KEY_MEETING_ACTIVATED_TIMESTAMP, settings.meetingActivatedTimestamp)
             .putString(KEY_DARK_SPLIT_CHAR, settings.darkPanelSplitChar.toString())
             .also { editor ->
                 val lastMod = settings.regularListLastModifiedMillis
@@ -1224,11 +1359,27 @@ object Repository {
             .putString(KEY_HASH_REGULAR_LIST_1000, settings.regularListFirst1000Hash)
             .putString(KEY_HASH_QUESTION_1000, settings.questionFirst1000Hash)
             .putString(KEY_HASH_TITLES_1000, settings.titlesFirst1000Hash)
+            .putString(KEY_HASH_REFERENCE_DATA_1000, settings.referenceDataFirst1000Hash ?: settings.inAppListsFirst1000Hash)
+            .putString(KEY_HASH_IN_APP_LISTS_1000, settings.inAppListsFirst1000Hash ?: settings.referenceDataFirst1000Hash)
+            .putString(KEY_URI_REFERENCE_DATA, settings.referenceDataUriString ?: settings.inAppListsUriString)
+            .putString(KEY_URI_IN_APP_LISTS, settings.inAppListsUriString ?: settings.referenceDataUriString)
+            .putString(KEY_REFERENCE_DATA_DISPLAY_NAME, settings.referenceDataDisplayName ?: settings.inAppListsDisplayName)
+            .putString(KEY_IN_APP_LISTS_DISPLAY_NAME, settings.inAppListsDisplayName ?: settings.referenceDataDisplayName)
+            .putString(KEY_REFERENCE_DATA_RELATIVE_PATH, settings.referenceDataRelativePath ?: settings.inAppListsRelativePath)
+            .putString(KEY_IN_APP_LISTS_RELATIVE_PATH, settings.inAppListsRelativePath ?: settings.referenceDataRelativePath)
             .putLong(KEY_LAST_SYNC_TIME, settings.lastSyncTime)
             .putBoolean(KEY_VEHICLE_REG_PROMPT_ENABLED, settings.vehicleRegPromptEnabled)
             .putBoolean(KEY_CAR_REG_REMINDER_ENABLED, settings.carRegReminderEnabled)
             .putInt(KEY_CAR_REG_REMINDER_DURATION, settings.carRegReminderDuration)
             .also { editor ->
+                val refCreated = settings.inAppListsCreatedMillis ?: settings.referenceDataCreatedMillis
+                refCreated?.let { editor.putLong(KEY_IN_APP_LISTS_CREATED, it); editor.putLong(KEY_REFERENCE_DATA_CREATED, it) } ?: run { editor.remove(KEY_IN_APP_LISTS_CREATED); editor.remove(KEY_REFERENCE_DATA_CREATED) }
+                val refLastMod = settings.inAppListsLastModifiedMillis ?: settings.referenceDataLastModifiedMillis
+                refLastMod?.let { editor.putLong(KEY_IN_APP_LISTS_LAST_MODIFIED, it); editor.putLong(KEY_REFERENCE_DATA_LAST_MODIFIED, it) } ?: run { editor.remove(KEY_IN_APP_LISTS_LAST_MODIFIED); editor.remove(KEY_REFERENCE_DATA_LAST_MODIFIED) }
+                val refSize = settings.inAppListsSize ?: settings.referenceDataSize
+                refSize?.let { editor.putLong(KEY_SIZE_IN_APP_LISTS, it); editor.putLong(KEY_SIZE_REFERENCE_DATA, it) } ?: run { editor.remove(KEY_SIZE_IN_APP_LISTS); editor.remove(KEY_SIZE_REFERENCE_DATA) }
+                val refId = settings.inAppListsMediaStoreId ?: settings.referenceDataMediaStoreId
+                refId?.let { editor.putLong(KEY_ID_IN_APP_LISTS, it); editor.putLong(KEY_ID_REFERENCE_DATA, it) } ?: run { editor.remove(KEY_ID_IN_APP_LISTS); editor.remove(KEY_ID_REFERENCE_DATA) }
                 settings.namesMediaStoreId?.let { editor.putLong(KEY_ID_NAMES, it) } ?: editor.remove(KEY_ID_NAMES)
                 settings.rolesMediaStoreId?.let { editor.putLong(KEY_ID_ROLES, it) } ?: editor.remove(KEY_ID_ROLES)
                 settings.locationsMediaStoreId?.let { editor.putLong(KEY_ID_LOCATIONS, it) } ?: editor.remove(KEY_ID_LOCATIONS)
@@ -1454,9 +1605,9 @@ object Repository {
         }.getOrNull()
     }
 
-    // Apply current retention setting immediately and persist (90 days)
+    // Apply current retention setting immediately and persist (30 days)
     fun applyRetentionNow() {
-        pruneHistoryOlderThan(days = 90L)
+        pruneHistoryOlderThan(days = 30L)
         saveHistory()
     }
 
@@ -1476,9 +1627,29 @@ object Repository {
             // PASSIVE RESET CHECK: Always check date first
             checkAndApplyPassiveReset()
 
-            val namesSheets = if (!settings.warehouseModeEnabled) listOf("Theatre") else (if (settings.isWarehouseActive) listOf("Youth") else listOf("Rehearsals"))
+            val namesSheets = if (!settings.warehouseModeEnabled) listOf("Theatre") else (when (settings.warehouseState) { 1 -> listOf("Youth"); else -> listOf("Rehearsals") })
             val rolesSheets = if (!settings.warehouseModeEnabled) listOf("Role") else listOf("Warehouse Roles")
             val locsSheets = if (!settings.warehouseModeEnabled) listOf("Locations") else listOf("Warehouse")
+
+            // In App Lists (Combined Workbook for Roles, Locations, Questions, Titles)
+            val inAppListsUriPref = preferredUriString(
+                settings.inAppListsUriString ?: settings.referenceDataUriString,
+                settings.inAppListsDisplayName ?: settings.referenceDataDisplayName,
+                settings.inAppListsRelativePath ?: settings.referenceDataRelativePath
+            )
+            if (!inAppListsUriPref.isNullOrBlank()) {
+                processInAppListsWorkbook(inAppListsUriPref)
+                updateSettings { it.copy(
+                    inAppListsMediaStoreId = getMediaStoreId(inAppListsUriPref),
+                    inAppListsLastModifiedMillis = getUriLastModifiedMillis(inAppListsUriPref),
+                    inAppListsSize = getUriSize(inAppListsUriPref),
+                    inAppListsFirst1000Hash = computeFirstNHash(inAppListsUriPref, 1000) ?: it.inAppListsFirst1000Hash,
+                    referenceDataMediaStoreId = getMediaStoreId(inAppListsUriPref),
+                    referenceDataLastModifiedMillis = getUriLastModifiedMillis(inAppListsUriPref),
+                    referenceDataSize = getUriSize(inAppListsUriPref),
+                    referenceDataFirst1000Hash = computeFirstNHash(inAppListsUriPref, 1000) ?: it.referenceDataFirst1000Hash
+                ) }
+            }
 
             // Names
             val namesUriPref = preferredUriString(settings.namesUriString, settings.namesDisplayName, settings.namesRelativePath)
@@ -1542,11 +1713,15 @@ object Repository {
             val questionLinesRaw = readExcelColumn(questionUriPref, 1)
             if (questionLinesRaw.isNotEmpty()) {
                 loadQuestionLines(questionLinesRaw)
+                val b17Val = readCellB17(questionUriPref)
+                val b18Val = readCellB18(questionUriPref)
                 updateSettings { it.copy(
                     questionMediaStoreId = getMediaStoreId(questionUriPref),
                     questionLastModifiedMillis = getUriLastModifiedMillis(questionUriPref),
                     questionSize = getUriSize(questionUriPref),
-                    questionFirst1000Hash = computeFirstNHash(questionUriPref, 1000) ?: it.questionFirst1000Hash
+                    questionFirst1000Hash = computeFirstNHash(questionUriPref, 1000) ?: it.questionFirst1000Hash,
+                    theatreMeetingDurationHours = b17Val ?: it.theatreMeetingDurationHours,
+                    warehouseMeetingDurationHours = b18Val ?: it.warehouseMeetingDurationHours
                 ) }
             }
             // Titles ...
@@ -1577,9 +1752,45 @@ object Repository {
             // PASSIVE RESET CHECK: Always check date first, independent of file metadata.
             // This is the most critical check for automatic clearing of the Cast list.
             checkAndApplyPassiveReset()
+
+            // In App Lists change detection (Combined Workbook)
+            preferredUriString(
+                settings.inAppListsUriString ?: settings.referenceDataUriString,
+                settings.inAppListsDisplayName ?: settings.referenceDataDisplayName,
+                settings.inAppListsRelativePath ?: settings.referenceDataRelativePath
+            )?.let { uriStr ->
+                if (!canOpenUri(uriStr)) {
+                    updateSettings { it.copy(inAppListsNeedsRegrant = true, referenceDataNeedsRegrant = true) }
+                } else {
+                    val currentId = getMediaStoreId(uriStr)
+                    val idChanged = currentId != null && currentId != settings.inAppListsMediaStoreId && currentId != settings.referenceDataMediaStoreId
+                    val currentLastMod = getUriLastModifiedMillis(uriStr)
+                    val storedLastMod = settings.inAppListsLastModifiedMillis ?: settings.referenceDataLastModifiedMillis
+                    val lastModChanged = currentLastMod != null && (storedLastMod == null || currentLastMod > storedLastMod)
+                    val currentHash = computeFirstNHash(uriStr, 1000)
+                    val hashChanged = currentHash != null && currentHash != settings.inAppListsFirst1000Hash && currentHash != settings.referenceDataFirst1000Hash
+                    val currentSize = getUriSize(uriStr)
+                    val sizeChanged = currentSize != null && currentSize != settings.inAppListsSize && currentSize != settings.referenceDataSize
+
+                    if (idChanged || lastModChanged || hashChanged || sizeChanged) {
+                        Log.d("SignIn", "In App Lists Database Change Detected. Reloading worksheets.")
+                        processInAppListsWorkbook(uriStr)
+                        updateSettings { it.copy(
+                            inAppListsMediaStoreId = currentId,
+                            inAppListsLastModifiedMillis = currentLastMod,
+                            inAppListsSize = currentSize,
+                            inAppListsFirst1000Hash = currentHash ?: it.inAppListsFirst1000Hash,
+                            referenceDataMediaStoreId = currentId,
+                            referenceDataLastModifiedMillis = currentLastMod,
+                            referenceDataSize = currentSize,
+                            referenceDataFirst1000Hash = currentHash ?: it.referenceDataFirst1000Hash
+                        ) }
+                    }
+                }
+            }
             
             // Names: resolve, check openability, then compare MediaStore ID, last-modified, and first 1000 lines hash
-            val namesSheets = if (!settings.warehouseModeEnabled) listOf("Theatre") else (if (settings.isWarehouseActive) listOf("Youth") else listOf("Rehearsals"))
+            val namesSheets = if (!settings.warehouseModeEnabled) listOf("Theatre") else (when (settings.warehouseState) { 1 -> listOf("Youth"); else -> listOf("Rehearsals") })
             val rolesSheets = if (!settings.warehouseModeEnabled) listOf("Role") else listOf("Warehouse Roles")
             val locsSheets = if (!settings.warehouseModeEnabled) listOf("Locations") else listOf("Warehouse")
 
@@ -1753,11 +1964,15 @@ object Repository {
                     val lines = readExcelColumn(uriStr, 1)
                     if (lines.isNotEmpty()) {
                         loadQuestionLines(lines)
+                        val b17Val = readCellB17(uriStr)
+                        val b18Val = readCellB18(uriStr)
                         updateSettings { it.copy(
                             questionMediaStoreId = currentId,
                             questionLastModifiedMillis = currentLastMod,
                             questionSize = currentSize,
-                            questionFirst1000Hash = currentHash ?: it.questionFirst1000Hash
+                            questionFirst1000Hash = currentHash ?: it.questionFirst1000Hash,
+                            theatreMeetingDurationHours = b17Val ?: it.theatreMeetingDurationHours,
+                            warehouseMeetingDurationHours = b18Val ?: it.warehouseMeetingDurationHours
                         ) }
                     }
                 }
@@ -2083,11 +2298,16 @@ object Repository {
             .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
             .build()
 
-        // Schedule to run every configurable interval in minutes
-        val effectiveIntervalMinutes = settings.hourlyRefreshInterval.coerceAtLeast(15).toLong()
+        val effectiveIntervalMinutes = 240L // 4 hours
+        val dailyTotalMinutes = settings.dailyJobHour * 60 + settings.dailyJobMinute
+        val currentTotalMinutes = LocalTime.now().hour * 60 + LocalTime.now().minute
+        var initialDelayMinutes = ((dailyTotalMinutes + 30 - currentTotalMinutes) % 240).toLong()
+        if (initialDelayMinutes < 0L) initialDelayMinutes += 240L
+        if (initialDelayMinutes == 0L) initialDelayMinutes = 30L
+
         val request = PeriodicWorkRequestBuilder<HourlyRefreshWorker>(effectiveIntervalMinutes, TimeUnit.MINUTES)
             .setConstraints(constraints)
-            .setInitialDelay(1, TimeUnit.MINUTES) // Start quickly after app launch
+            .setInitialDelay(initialDelayMinutes, TimeUnit.MINUTES)
             .build()
 
         workManager.enqueueUniquePeriodicWork(
@@ -2133,7 +2353,23 @@ object Repository {
      * Resets the warehouse active button to OFF. Called during daily refresh.
      */
     fun resetWarehouseState() {
-        updateSettings { it.copy(isWarehouseActive = false) }
+        updateSettings { it.copy(warehouseState = 0) }
+    }
+
+    /**
+     * Check if meeting mode duration has expired since activation and deactivate if so.
+     */
+    fun checkAndApplyMeetingTimeout() {
+        if (settings.meetingButtonActive && settings.meetingActivatedTimestamp > 0L) {
+            val durationHours = if (settings.warehouseModeEnabled) settings.warehouseMeetingDurationHours else settings.theatreMeetingDurationHours
+            val durationMillis = durationHours * 3600L * 1000L
+            val elapsed = System.currentTimeMillis() - settings.meetingActivatedTimestamp
+            if (elapsed >= durationMillis) {
+                Log.d("SignIn", "Meeting mode duration (${durationHours}h) expired. Deactivating meeting mode.")
+                updateSettings { it.copy(meetingButtonActive = false, meetingActivatedTimestamp = 0L) }
+                logAdminEvent("Meeting mode automatically deactivated (duration expired)")
+            }
+        }
     }
 
     /**
@@ -2283,6 +2519,171 @@ object Repository {
         } catch (e: Exception) {
             Log.e("Repository", "Error reading Excel file: ${e.message}")
             emptyList()
+        }
+    }
+
+    var theatreLocations: List<String> = emptyList()
+    var warehouseLocations: List<String> = emptyList()
+    var theatreRoles: List<String> = emptyList()
+    var warehouseRoles: List<String> = emptyList()
+
+    fun updateActiveRolesAndLocations() {
+        val activeLocs = if (settings.warehouseModeEnabled && warehouseLocations.isNotEmpty()) warehouseLocations else theatreLocations
+        if (activeLocs.isNotEmpty()) loadLocations(activeLocs)
+        val activeRoles = if (settings.warehouseModeEnabled && warehouseRoles.isNotEmpty()) warehouseRoles else theatreRoles
+        if (activeRoles.isNotEmpty()) loadRoles(activeRoles)
+    }
+
+    private fun findSheetByKeywords(wb: Workbook, keywords: List<String>, fallbackIndex: Int): Sheet? {
+        for (i in 0 until wb.numberOfSheets) {
+            val name = wb.getSheetName(i)
+            for (kw in keywords) {
+                if (name.contains(kw, ignoreCase = true)) {
+                    return wb.getSheetAt(i)
+                }
+            }
+        }
+        return if (fallbackIndex < wb.numberOfSheets) wb.getSheetAt(fallbackIndex) else null
+    }
+
+    fun processInAppListsWorkbook(uriStr: String?) {
+        if (uriStr.isNullOrBlank()) return
+        try {
+            val uri = Uri.parse(uriStr)
+            appContext.contentResolver.openInputStream(uri)?.use { input ->
+                val workbook: Workbook = WorkbookFactory.create(input)
+                workbook.use { wb ->
+                    // 1. Locations Worksheet
+                    findSheetByKeywords(wb, listOf("location"), 0)?.let { locSheet ->
+                        val header = getCellValueAsString(locSheet.getRow(0)?.getCell(0))
+                        if (header.isNotBlank()) {
+                            updateSettings { it.copy(locationsHeader = header.take(30)) }
+                        }
+                        val theatreLocs = mutableListOf<String>()
+                        for (i in 1..19) { // Rows A2:A20
+                            val v = getCellValueAsString(locSheet.getRow(i)?.getCell(0))
+                            if (v.isNotBlank()) theatreLocs.add(v)
+                        }
+                        val warehouseLocs = mutableListOf<String>()
+                        for (i in 20..29) { // Rows A21:A30
+                            val v = getCellValueAsString(locSheet.getRow(i)?.getCell(0))
+                            if (v.isNotBlank()) warehouseLocs.add(v)
+                        }
+                        if (warehouseLocs.isEmpty() && theatreLocs.isEmpty()) {
+                            val allLocs = mutableListOf<String>()
+                            val last = locSheet.lastRowNum
+                            for (i in 1..last) {
+                                val v = getCellValueAsString(locSheet.getRow(i)?.getCell(0))
+                                if (v.isNotBlank()) allLocs.add(v)
+                            }
+                            theatreLocs.addAll(allLocs)
+                        }
+                        this.theatreLocations = theatreLocs
+                        this.warehouseLocations = warehouseLocs
+                        val activeLocs = if (settings.warehouseModeEnabled && warehouseLocs.isNotEmpty()) warehouseLocs else theatreLocs
+                        if (activeLocs.isNotEmpty()) loadLocations(activeLocs)
+                    }
+
+                    // 2. Roles Worksheet
+                    findSheetByKeywords(wb, listOf("role"), 1)?.let { roleSheet ->
+                        val header = getCellValueAsString(roleSheet.getRow(0)?.getCell(0))
+                        if (header.isNotBlank()) {
+                            updateSettings { it.copy(rolesHeader = header.take(30)) }
+                        }
+                        val theatreRolesList = mutableListOf<String>()
+                        for (i in 1..19) { // Rows A2:A20
+                            val v = getCellValueAsString(roleSheet.getRow(i)?.getCell(0))
+                            if (v.isNotBlank()) theatreRolesList.add(v)
+                        }
+                        val warehouseRolesList = mutableListOf<String>()
+                        for (i in 20..29) { // Rows A21:A30
+                            val v = getCellValueAsString(roleSheet.getRow(i)?.getCell(0))
+                            if (v.isNotBlank()) warehouseRolesList.add(v)
+                        }
+                        if (warehouseRolesList.isEmpty() && theatreRolesList.isEmpty()) {
+                            val allRoles = mutableListOf<String>()
+                            val last = roleSheet.lastRowNum
+                            for (i in 1..last) {
+                                val v = getCellValueAsString(roleSheet.getRow(i)?.getCell(0))
+                                if (v.isNotBlank()) allRoles.add(v)
+                            }
+                            theatreRolesList.addAll(allRoles)
+                        }
+                        this.theatreRoles = theatreRolesList
+                        this.warehouseRoles = warehouseRolesList
+                        val activeRoles = if (settings.warehouseModeEnabled && warehouseRolesList.isNotEmpty()) warehouseRolesList else theatreRolesList
+                        if (activeRoles.isNotEmpty()) loadRoles(activeRoles)
+                    }
+
+                    // 3. Questions Worksheet
+                    findSheetByKeywords(wb, listOf("question"), 2)?.let { qSheet ->
+                        val qLines = mutableListOf<String>()
+                        val maxRow = maxOf(qSheet.lastRowNum, 17)
+                        for (i in 0..maxRow) { // Row 0 = B1, Rows 1..13 = B2..B14, Rows 14..15 = B15..B16, Row 16 = B17, Row 17 = B18
+                            val v = getCellValueAsString(qSheet.getRow(i)?.getCell(1))
+                            qLines.add(v)
+                        }
+                        val b17Val = qLines.getOrNull(16)?.toIntOrNull()?.coerceIn(1, 24)
+                        val b18Val = qLines.getOrNull(17)?.toIntOrNull()?.coerceIn(1, 24)
+                        if (b17Val != null || b18Val != null) {
+                            updateSettings { it.copy(
+                                theatreMeetingDurationHours = b17Val ?: it.theatreMeetingDurationHours,
+                                warehouseMeetingDurationHours = b18Val ?: it.warehouseMeetingDurationHours
+                            ) }
+                        }
+                        if (qLines.any { it.isNotBlank() }) loadQuestionLines(qLines)
+                    }
+
+                    // 4. Titles Worksheet
+                    findSheetByKeywords(wb, listOf("title"), 3)?.let { titleSheet ->
+                        val titlesList = mutableListOf<String>()
+                        val last = titleSheet.lastRowNum
+                        for (i in 0..last) {
+                            val v = getCellValueAsString(titleSheet.getRow(i)?.getCell(1)).ifBlank {
+                                getCellValueAsString(titleSheet.getRow(i)?.getCell(0))
+                            }
+                            titlesList.add(v)
+                        }
+                        if (titlesList.isNotEmpty()) loadTitles(titlesList)
+                    }
+                }
+            }
+            val fileName = settings.inAppListsDisplayName ?: settings.referenceDataDisplayName ?: getDisplayName(uriStr) ?: uriStr
+            logAdminEvent("In App Lists change detected and enacted. File: $fileName. Worksheets loaded: Locations, Roles, Questions, Titles")
+        } catch (e: Exception) {
+            Log.e("Repository", "Error processing In App Lists workbook: ${e.message}")
+        }
+    }
+
+    fun processReferenceDataWorkbook(uriStr: String?) = processInAppListsWorkbook(uriStr)
+
+    /**
+     * Reads cell B17 (Row 17, Column B) from the Questions file for meeting duration hours (1-24).
+     */
+    fun readCellB17(uriStr: String?): Int? = readExcelCell(uriStr, 16, 1)
+
+    /**
+     * Reads cell B18 (Row 18, Column B) from the Questions file for warehouse meeting duration hours (1-24).
+     */
+    fun readCellB18(uriStr: String?): Int? = readExcelCell(uriStr, 17, 1)
+
+    private fun readExcelCell(uriStr: String?, rowIndex: Int, colIndex: Int): Int? {
+        if (uriStr.isNullOrBlank()) return null
+        return try {
+            val uri = Uri.parse(uriStr)
+            appContext.contentResolver.openInputStream(uri)?.use { input ->
+                val workbook: Workbook = WorkbookFactory.create(input)
+                workbook.use { wb ->
+                    val sheet = wb.getSheetAt(0)
+                    val row = sheet.getRow(rowIndex)
+                    val cell = row?.getCell(colIndex)
+                    val str = getCellValueAsString(cell)
+                    str.toIntOrNull()?.coerceIn(1, 24)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("Repository", "Error reading cell ($rowIndex, $colIndex) from questions file: ${e.message}")
+            null
         }
     }
 }

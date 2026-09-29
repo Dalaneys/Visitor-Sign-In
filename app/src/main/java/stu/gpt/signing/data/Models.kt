@@ -92,6 +92,25 @@ data class AppSettings(
     val regularListFirst1000Hash: String? = null,
     val questionFirst1000Hash: String? = null,
     val titlesFirst1000Hash: String? = null,
+    val referenceDataFirst1000Hash: String? = null,
+    val inAppListsFirst1000Hash: String? = null,
+    // In App Lists combined workbook fields
+    val referenceDataUriString: String? = null,
+    val inAppListsUriString: String? = null,
+    val referenceDataDisplayName: String? = null,
+    val inAppListsDisplayName: String? = null,
+    val referenceDataRelativePath: String? = null,
+    val inAppListsRelativePath: String? = null,
+    val referenceDataMediaStoreId: Long? = null,
+    val inAppListsMediaStoreId: Long? = null,
+    val referenceDataNeedsRegrant: Boolean = false,
+    val inAppListsNeedsRegrant: Boolean = false,
+    val referenceDataCreatedMillis: Long? = null,
+    val inAppListsCreatedMillis: Long? = null,
+    val referenceDataLastModifiedMillis: Long? = null,
+    val inAppListsLastModifiedMillis: Long? = null,
+    val referenceDataSize: Long? = null,
+    val inAppListsSize: Long? = null,
     // Timestamp of the last successful database sync/refresh
     val lastSyncTime: Long = 0,
     // Feature flag: when true, show Sign-In confirmation with optional Vehicle Reg input
@@ -101,7 +120,7 @@ data class AppSettings(
     // Duration in seconds for the car reg reminder pop-up (1-5)
     val carRegReminderDuration: Int = 2,
     // Refresh interval in minutes (15-1440)
-    val hourlyRefreshInterval: Int = 60,
+    val hourlyRefreshInterval: Int = 240,
     // Master toggle for the screen saver
     val screenSaverEnabled: Boolean = true,
     // Track version change to force a full sync once after upgrade
@@ -111,7 +130,13 @@ data class AppSettings(
     val logFolderRelativePath: String? = null,
     // Warehouse Mode settings
     val warehouseModeEnabled: Boolean = false,
-    val isWarehouseActive: Boolean = false,
+    val warehouseState: Int = 0, // 0 = GPT, 1 = YT, 2 = Meeting
+    // Meeting Mode settings
+    val meetingModeEnabled: Boolean = false,
+    val meetingButtonActive: Boolean = false,
+    val theatreMeetingDurationHours: Int = 3,
+    val warehouseMeetingDurationHours: Int = 3,
+    val meetingActivatedTimestamp: Long = 0L,
     // Dynamic split character for Dark mode panels (computed from members list upload)
     val darkPanelSplitChar: Char = 'L',
 ) {

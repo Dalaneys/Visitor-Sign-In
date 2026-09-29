@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -39,7 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
 import stu.gpt.signing.data.Repository
 
-private enum class DataKind { Names, Lists, Locations, RegularList, Questions, Titles }
+private enum class DataKind { Names, Lists, Locations, RegularList, Questions, Titles, ReferenceData, InAppLists }
 
 @Suppress("DEPRECATION")
 private fun showLargeToast(context: Context, message: String, textSizeSp: Float = 22f) {
@@ -109,91 +110,115 @@ fun AdminScreen(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri: Uri? ->
             if (uri != null) {
-                val lines = when (pendingPick) {
-                    DataKind.Names -> Repository.readExcelNames(uri.toString())
-                    DataKind.Titles, DataKind.Questions -> Repository.readExcelColumn(uri.toString(), 1)
-                    else -> Repository.readExcelColumn(uri.toString(), 0)
-                }
-                if (lines.isNotEmpty()) {
-                    when (pendingPick) {
-                        DataKind.Names -> {
-                            Repository.loadNames(lines)
-                            Repository.updateSettings { it.copy(
-                                namesUriString = uri.toString(),
-                                namesDisplayName = Repository.getDisplayName(uri.toString()),
-                                namesRelativePath = Repository.getRelativePath(uri.toString()),
-                                namesMediaStoreId = Repository.getMediaStoreId(uri.toString()),
-                                namesCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
-                                namesLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
-                                namesFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
-                            ) }
-                        }
-                        DataKind.Lists -> {
-                            Repository.updateSettings { it.copy(rolesHeader = lines.firstOrNull()?.take(30) ?: "") }
-                            Repository.loadRoles(lines.drop(1).filter { it.isNotBlank() })
-                            Repository.updateSettings { it.copy(
-                                rolesUriString = uri.toString(),
-                                rolesDisplayName = Repository.getDisplayName(uri.toString()),
-                                rolesRelativePath = Repository.getRelativePath(uri.toString()),
-                                rolesMediaStoreId = Repository.getMediaStoreId(uri.toString()),
-                                rolesCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
-                                rolesLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
-                                rolesFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
-                            ) }
-                        }
-                        DataKind.Locations -> {
-                            Repository.updateSettings { it.copy(locationsHeader = lines.firstOrNull()?.take(30) ?: "") }
-                            Repository.loadLocations(lines.drop(1).filter { it.isNotBlank() })
-                            Repository.updateSettings { it.copy(
-                                locationsUriString = uri.toString(),
-                                locationsDisplayName = Repository.getDisplayName(uri.toString()),
-                                locationsRelativePath = Repository.getRelativePath(uri.toString()),
-                                locationsMediaStoreId = Repository.getMediaStoreId(uri.toString()),
-                                locationsCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
-                                locationsLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
-                                locationsFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
-                            ) }
-                        }
-                        DataKind.RegularList -> {
-                            scope.launch { Repository.processRegularListLines(lines) }
-                            Repository.updateSettings { it.copy(
-                                regularListUriString = uri.toString(),
-                                regularListDisplayName = Repository.getDisplayName(uri.toString()),
-                                regularListRelativePath = Repository.getRelativePath(uri.toString()),
-                                regularListMediaStoreId = Repository.getMediaStoreId(uri.toString()),
-                                regularListCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
-                                regularListLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
-                                regularListFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
-                            ) }
-                        }
-                        DataKind.Questions -> {
-                            Repository.loadQuestionLines(lines)
-                            Repository.updateSettings { it.copy(
-                                questionUriString = uri.toString(),
-                                questionDisplayName = Repository.getDisplayName(uri.toString()),
-                                questionRelativePath = Repository.getRelativePath(uri.toString()),
-                                questionMediaStoreId = Repository.getMediaStoreId(uri.toString()),
-                                questionCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
-                                questionLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
-                                questionFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
-                            ) }
-                        }
-                        DataKind.Titles -> {
-                            Repository.loadTitles(lines)
-                            Repository.updateSettings { it.copy(
-                                titlesUriString = uri.toString(),
-                                titlesDisplayName = Repository.getDisplayName(uri.toString()),
-                                titlesRelativePath = Repository.getRelativePath(uri.toString()),
-                                titlesMediaStoreId = Repository.getMediaStoreId(uri.toString()),
-                                titlesCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
-                                titlesLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
-                                titlesFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
-                            ) }
-                        }
-                        null -> {}
+                if (pendingPick == DataKind.InAppLists || pendingPick == DataKind.ReferenceData) {
+                    scope.launch {
+                        Repository.processInAppListsWorkbook(uri.toString())
                     }
+                    Repository.updateSettings { it.copy(
+                        inAppListsUriString = uri.toString(),
+                        inAppListsDisplayName = Repository.getDisplayName(uri.toString()),
+                        inAppListsRelativePath = Repository.getRelativePath(uri.toString()),
+                        inAppListsMediaStoreId = Repository.getMediaStoreId(uri.toString()),
+                        inAppListsCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
+                        inAppListsLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
+                        inAppListsFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000),
+                        referenceDataUriString = uri.toString(),
+                        referenceDataDisplayName = Repository.getDisplayName(uri.toString()),
+                        referenceDataRelativePath = Repository.getRelativePath(uri.toString()),
+                        referenceDataMediaStoreId = Repository.getMediaStoreId(uri.toString()),
+                        referenceDataCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
+                        referenceDataLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
+                        referenceDataFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
+                    ) }
                     try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Throwable) { }
-                    showLargeToast(context, "File uploaded successfully", 18f)
+                    showLargeToast(context, "In App Lists uploaded successfully", 18f)
+                } else {
+                    val lines = when (pendingPick) {
+                        DataKind.Names -> Repository.readExcelNames(uri.toString())
+                        DataKind.Titles, DataKind.Questions -> Repository.readExcelColumn(uri.toString(), 1)
+                        else -> Repository.readExcelColumn(uri.toString(), 0)
+                    }
+                    if (lines.isNotEmpty()) {
+                        when (pendingPick) {
+                            DataKind.Names -> {
+                                Repository.loadNames(lines)
+                                Repository.updateSettings { it.copy(
+                                    namesUriString = uri.toString(),
+                                    namesDisplayName = Repository.getDisplayName(uri.toString()),
+                                    namesRelativePath = Repository.getRelativePath(uri.toString()),
+                                    namesMediaStoreId = Repository.getMediaStoreId(uri.toString()),
+                                    namesCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
+                                    namesLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
+                                    namesFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
+                                ) }
+                            }
+                            DataKind.Lists -> {
+                                Repository.updateSettings { it.copy(rolesHeader = lines.firstOrNull()?.take(30) ?: "") }
+                                Repository.loadRoles(lines.drop(1).filter { it.isNotBlank() })
+                                Repository.updateSettings { it.copy(
+                                    rolesUriString = uri.toString(),
+                                    rolesDisplayName = Repository.getDisplayName(uri.toString()),
+                                    rolesRelativePath = Repository.getRelativePath(uri.toString()),
+                                    rolesMediaStoreId = Repository.getMediaStoreId(uri.toString()),
+                                    rolesCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
+                                    rolesLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
+                                    rolesFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
+                                ) }
+                            }
+                            DataKind.Locations -> {
+                                Repository.updateSettings { it.copy(locationsHeader = lines.firstOrNull()?.take(30) ?: "") }
+                                Repository.loadLocations(lines.drop(1).filter { it.isNotBlank() })
+                                Repository.updateSettings { it.copy(
+                                    locationsUriString = uri.toString(),
+                                    locationsDisplayName = Repository.getDisplayName(uri.toString()),
+                                    locationsRelativePath = Repository.getRelativePath(uri.toString()),
+                                    locationsMediaStoreId = Repository.getMediaStoreId(uri.toString()),
+                                    locationsCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
+                                    locationsLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
+                                    locationsFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
+                                ) }
+                            }
+                            DataKind.RegularList -> {
+                                scope.launch { Repository.processRegularListLines(lines) }
+                                Repository.updateSettings { it.copy(
+                                    regularListUriString = uri.toString(),
+                                    regularListDisplayName = Repository.getDisplayName(uri.toString()),
+                                    regularListRelativePath = Repository.getRelativePath(uri.toString()),
+                                    regularListMediaStoreId = Repository.getMediaStoreId(uri.toString()),
+                                    regularListCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
+                                    regularListLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
+                                    regularListFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
+                                ) }
+                            }
+                            DataKind.Questions -> {
+                                Repository.loadQuestionLines(lines)
+                                Repository.updateSettings { it.copy(
+                                    questionUriString = uri.toString(),
+                                    questionDisplayName = Repository.getDisplayName(uri.toString()),
+                                    questionRelativePath = Repository.getRelativePath(uri.toString()),
+                                    questionMediaStoreId = Repository.getMediaStoreId(uri.toString()),
+                                    questionCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
+                                    questionLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
+                                    questionFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
+                                ) }
+                            }
+                            DataKind.Titles -> {
+                                Repository.loadTitles(lines)
+                                Repository.updateSettings { it.copy(
+                                    titlesUriString = uri.toString(),
+                                    titlesDisplayName = Repository.getDisplayName(uri.toString()),
+                                    titlesRelativePath = Repository.getRelativePath(uri.toString()),
+                                    titlesMediaStoreId = Repository.getMediaStoreId(uri.toString()),
+                                    titlesCreatedMillis = Repository.getUriCreatedMillis(uri.toString()),
+                                    titlesLastModifiedMillis = Repository.getUriLastModifiedMillis(uri.toString()),
+                                    titlesFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
+                                ) }
+                            }
+                            else -> {}
+                        }
+                        try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Throwable) { }
+                        showLargeToast(context, "File uploaded successfully", 18f)
+                    }
                 }
             }
             pendingPick = null
@@ -271,18 +296,33 @@ fun AdminScreen(
                             Text("Change PIN", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
                     }
-                    AdminTile(title = "Warehouse Mode", modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    AdminTile(title = "Modes", modifier = Modifier.weight(1f).fillMaxHeight()) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Text("Enabled", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                            Text("Warehouse Enable", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(1f))
                             Switch(
                                 checked = Repository.settings.warehouseModeEnabled,
+                                enabled = !Repository.settings.meetingModeEnabled,
                                 onCheckedChange = { enabled -> 
                                     Repository.updateSettings { s -> s.copy(warehouseModeEnabled = enabled) }
                                     if (!enabled) {
-                                        // If feature is disabled, force back to default Cast-1
-                                        Repository.updateSettings { it.copy(isWarehouseActive = false) }
+                                        Repository.updateSettings { it.copy(warehouseState = 0) }
                                         scope.launch { Repository.refreshAllFromPersistedUris() }
                                     }
+                                },
+                                modifier = Modifier.scale(0.9f)
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Meeting Mode", fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                                Text("Theatre Duration: ${settings.theatreMeetingDurationHours}h (Questions B17)\nWarehouse Duration: ${settings.warehouseMeetingDurationHours}h (Questions B18)", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                            }
+                            Switch(
+                                checked = Repository.settings.meetingModeEnabled,
+                                enabled = !Repository.settings.warehouseModeEnabled,
+                                onCheckedChange = { enabled -> 
+                                    Repository.updateSettings { s -> s.copy(meetingModeEnabled = enabled, meetingButtonActive = false, meetingActivatedTimestamp = 0L) }
                                 },
                                 modifier = Modifier.scale(0.9f)
                             )
@@ -351,8 +391,14 @@ fun AdminScreen(
                                     value = carRegDurationInput,
                                     onValueChange = { carRegDurationInput = it.filter { c -> c.isDigit() }.take(1) },
                                     singleLine = true,
-                                    modifier = Modifier.width(60.dp),
-                                    textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                                    modifier = Modifier.width(46.dp),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent
+                                    ),
+                                    textStyle = TextStyle(textAlign = TextAlign.Center, fontSize = 16.sp, fontWeight = FontWeight.Bold),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                 )
                             }
@@ -384,32 +430,8 @@ fun AdminScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Auto Export Data Daily", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(0.7f))
-                        Switch(modifier = Modifier.scale(1.0f), checked = Repository.settings.autoExportEnabled, onCheckedChange = {
-                            Repository.updateSettings { s -> s.copy(autoExportEnabled = it) }
-                        })
-                    }
-                    if (Repository.settings.dailyJobEnabled) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-                            Text("Auto Sign-out Time (HH:MM)", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(0.5f))
-                            Column(modifier = Modifier.weight(0.5f), horizontalAlignment = Alignment.End) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    TextField(value = jobHourInput, onValueChange = { jobHourInput = it.filter { c -> c.isDigit() }.take(2) }, singleLine = true, modifier = Modifier.width(60.dp), textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center, fontSize = 16.sp, fontWeight = FontWeight.Bold), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                                    Text(":", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
-                                    TextField(value = jobMinuteInput, onValueChange = { jobMinuteInput = it.filter { c -> c.isDigit() }.take(2) }, singleLine = true, modifier = Modifier.width(60.dp), textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center, fontSize = 16.sp, fontWeight = FontWeight.Bold), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Refresh Interval (minutes)", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(0.7f))
-                        TextField(value = hourlyIntervalInput, onValueChange = { hourlyIntervalInput = it.filter { c -> c.isDigit() }.take(4) }, singleLine = true, modifier = Modifier.width(80.dp), textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center, fontSize = 16.sp, fontWeight = FontWeight.Bold), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Log Save Folder", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                            Text("Log Save Folder (Saved every 4 hours)", fontWeight = FontWeight.Medium, fontSize = 16.sp)
                             val folderPathDisplay = if (settings.logFolderUriString == null) {
                                 "Not Selected"
                             } else {
@@ -468,16 +490,42 @@ fun AdminScreen(
                         }
                     }
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            DataButton("Members", modifier = Modifier.weight(1f).height(40.dp), backgroundColor = if (namesUploaded) Color(0xFFBEE9AD) else Color(0xFFD9D9D9)) { pendingPick = DataKind.Names; filePicker.launch(mimeTypes()) }
-                            DataButton("Cast", modifier = Modifier.weight(1f).height(40.dp), backgroundColor = if (stageUploaded) Color(0xFFBEE9AD) else Color(0xFFD9D9D9)) { pendingPick = DataKind.RegularList; filePicker.launch(mimeTypes()) }
-                            DataButton("Roles", modifier = Modifier.weight(1f).height(40.dp), backgroundColor = if (Repository.roles.isNotEmpty()) Color(0xFFBEE9AD) else Color(0xFFD9D9D9)) { pendingPick = DataKind.Lists; filePicker.launch(mimeTypes()) }
+                    val refDataUploaded by remember {
+                        derivedStateOf {
+                            Repository.settings.inAppListsUriString != null ||
+                            Repository.settings.referenceDataUriString != null ||
+                            Repository.roles.isNotEmpty() ||
+                            Repository.locations.isNotEmpty() ||
+                            Repository.questionLines.isNotEmpty()
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            DataButton("Locations", modifier = Modifier.weight(1f).height(40.dp), backgroundColor = if (Repository.locations.isNotEmpty()) Color(0xFFBEE9AD) else Color(0xFFD9D9D9)) { pendingPick = DataKind.Locations; filePicker.launch(mimeTypes()) }
-                            DataButton("Titles", modifier = Modifier.weight(1f).height(40.dp), backgroundColor = if (Repository.settings.titlesUriString != null) Color(0xFFBEE9AD) else Color(0xFFD9D9D9)) { pendingPick = DataKind.Titles; filePicker.launch(mimeTypes()) }
-                            DataButton("Questions", modifier = Modifier.weight(1f).height(40.dp), backgroundColor = if (Repository.questionLines.isNotEmpty()) Color(0xFFBEE9AD) else Color(0xFFD9D9D9)) { pendingPick = DataKind.Questions; filePicker.launch(mimeTypes()) }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        DataButton(
+                            label = "Cast",
+                            modifier = Modifier.weight(1f).height(56.dp),
+                            backgroundColor = if (stageUploaded) Color(0xFFBEE9AD) else Color(0xFFD9D9D9)
+                        ) {
+                            pendingPick = DataKind.RegularList
+                            filePicker.launch(mimeTypes())
+                        }
+                        DataButton(
+                            label = "Members",
+                            modifier = Modifier.weight(1f).height(56.dp),
+                            backgroundColor = if (namesUploaded) Color(0xFFBEE9AD) else Color(0xFFD9D9D9)
+                        ) {
+                            pendingPick = DataKind.Names
+                            filePicker.launch(mimeTypes())
+                        }
+                        DataButton(
+                            label = "In App Lists",
+                            modifier = Modifier.weight(1f).height(56.dp),
+                            backgroundColor = if (refDataUploaded) Color(0xFFBEE9AD) else Color(0xFFD9D9D9)
+                        ) {
+                            pendingPick = DataKind.InAppLists
+                            filePicker.launch(mimeTypes())
                         }
                     }
                 }
@@ -500,7 +548,6 @@ fun AdminScreen(
                     Button(
                         onClick = { 
                             scope.launch {
-                                Repository.logAdminEvent("Manual refresh triggered")
                                 Repository.refreshAllFromPersistedUris()
                                 showLargeToast(context, "Refreshed") 
                             }
@@ -569,7 +616,7 @@ fun AdminScreen(
             }
 
             Text(
-                text = "Created by Stu Sorrell, Using Gemini-3 in 2026. v ${Repository.VERSION}",
+                text = "Created by Stu Sorrell, v4.2.2026.10",
                 fontSize = 16.sp,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                 color = Color.Gray,
@@ -588,7 +635,7 @@ fun AdminScreen(
                 Column {
                     Text("Enter a new 4-digit PIN to access this Admin area via the Name box.", fontSize = 16.sp)
                     Spacer(Modifier.height(16.dp))
-                    TextField(
+                    OutlinedTextField(
                         value = newPin,
                         onValueChange = { input ->
                             newPin = input.filter { it.isDigit() }.take(4)
@@ -596,7 +643,14 @@ fun AdminScreen(
                         placeholder = { Text("4-digit PIN") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF3366CC),
+                            unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f),
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White
+                        ),
+                        textStyle = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
                     )
                 }
@@ -747,8 +801,14 @@ private fun DataButton(label: String, modifier: Modifier = Modifier, backgroundC
         shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.1f))
     ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            Text(label, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)) {
+            Text(
+                text = label,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
         }
     }
 }

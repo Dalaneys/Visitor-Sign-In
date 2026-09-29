@@ -17,18 +17,18 @@ class HourlyRefreshWorker(
     override suspend fun doWork(): Result {
         return try {
             Log.d("HourlyRefreshWorker", "Starting hourly refresh job…")
-            Repository.logAdminEvent("Hourly refresh job started")
 
             // Refresh all databases from persisted URIs if changed
-            // For hourly refresh, we don't need conditional Cast behavior
             Repository.refreshAllFromPersistedUrisIfChanged(false)
 
+            // Save records/logs regularly and check meeting timeout
+            Repository.saveDailyRecordFile()
+            Repository.checkAndApplyMeetingTimeout()
+
             Log.d("HourlyRefreshWorker", "Hourly refresh job completed successfully.")
-            Repository.logAdminEvent("Hourly refresh job completed successfully")
             Result.success()
         } catch (t: Throwable) {
             Log.e("HourlyRefreshWorker", "Hourly refresh job failed: ${t.message}", t)
-            Repository.logAdminEvent("Hourly refresh job failed: ${t.message}")
             Result.retry()
         }
     }

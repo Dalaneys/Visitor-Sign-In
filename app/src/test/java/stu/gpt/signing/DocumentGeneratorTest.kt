@@ -2,8 +2,13 @@ package stu.gpt.signing
 
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import org.junit.Test
+import stu.gpt.signing.data.HistoryEntry
 import java.io.FileOutputStream
 import java.io.File
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 class DocumentGeneratorTest {
 
@@ -48,6 +53,46 @@ class DocumentGeneratorTest {
             FileOutputStream(docxFile).use { out ->
                 doc.write(out)
             }
+        }
+    }
+
+    @Test
+    fun generate3DaysRecords() {
+        val now = LocalDateTime.now()
+        val zone = ZoneId.systemDefault()
+        
+        val sampleEntries = listOf(
+            HistoryEntry("Alice Smith", "Director", now.minusDays(0).withHour(9).toInstant(zone.rules.getOffset(now)).toEpochMilli(), now.minusDays(0).withHour(12).toInstant(zone.rules.getOffset(now)).toEpochMilli(), "AB12 CDE"),
+            HistoryEntry("Bob Jones", "Cast", now.minusDays(1).withHour(10).toInstant(zone.rules.getOffset(now)).toEpochMilli(), now.minusDays(1).withHour(14).toInstant(zone.rules.getOffset(now)).toEpochMilli(), "XY65 ZW"),
+            HistoryEntry("Charlie Brown", "Stage Crew", now.minusDays(2).withHour(11).toInstant(zone.rules.getOffset(now)).toEpochMilli(), now.minusDays(2).withHour(15).toInstant(zone.rules.getOffset(now)).toEpochMilli(), null)
+        )
+
+        for (i in 0..2) {
+            val targetDate = now.minusDays(i.toLong())
+            val targetDateStr = targetDate.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"))
+            val file = File("Records_${targetDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))}.txt")
+            
+            val dayEntries = sampleEntries.take(i + 1)
+            val content = buildString {
+                append("Sign-In Records for $targetDateStr (Previous 24hrs)\n")
+                append("Generated at: ${targetDate.format(DateTimeFormatter.ofPattern("HH:mm:ss"))} (Single daily file updated in place)\n")
+                append("-".repeat(65) + "\n")
+                append(String.format("%-25s %-20s %-12s %-8s %-8s %-12s\n", "Name", "Role/Loc", "Date", "In", "Out", "Reg"))
+                
+                dayEntries.forEach { entry ->
+                    val arrivalDt = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.arrivalEpochMillis), zone)
+                    val departureDt = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.departureEpochMillis), zone)
+                    append(String.format("%-25s %-20s %-12s %-8s %-8s %-12s\n",
+                        entry.name.take(24),
+                        entry.roleOrLocation.take(19),
+                        arrivalDt.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")),
+                        arrivalDt.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        departureDt.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        entry.vehicleReg ?: ""
+                    ))
+                }
+            }
+            file.writeText(content)
         }
     }
 

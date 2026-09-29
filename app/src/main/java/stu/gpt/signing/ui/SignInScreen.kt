@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -160,7 +161,18 @@ fun SignInScreen(
     }
     val signInButtonColor = if (isSignInEnabled) Color(0xff00ff00) else Color(0xFFEAF8E4)
 
-    val isDarkMode = stageMembers.isEmpty()
+    val isCastSignedIn = Repository.stageActive.isNotEmpty()
+    
+    // Check meeting mode duration timeout
+    LaunchedEffect(Unit) {
+        Repository.checkAndApplyMeetingTimeout()
+    }
+
+    val isMeetingActive = (!isCastSignedIn) && (
+        (settings.meetingModeEnabled && settings.meetingButtonActive) ||
+        (settings.warehouseModeEnabled && settings.warehouseState == 2)
+    )
+    val isDarkMode = stageMembers.isEmpty() || isMeetingActive
     val validMidChar = settings.darkPanelSplitChar
     val nextChar = if (validMidChar < 'Z') (validMidChar + 1) else 'Z'
 
@@ -187,27 +199,28 @@ fun SignInScreen(
         color = settings.primaryBgColor
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Discreet Sync Timestamp (Top-Right)
+            // Discreet Next Sync Timestamp (Top-Right)
             if (settings.lastSyncTime > 0) {
-                val syncTime = remember(settings.lastSyncTime) {
-                    java.time.Instant.ofEpochMilli(settings.lastSyncTime)
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                val nextSyncMillis = settings.lastSyncTime + (settings.hourlyRefreshInterval * 60 * 1000L)
+                val syncTime = remember(nextSyncMillis) {
+                    Instant.ofEpochMilli(nextSyncMillis)
+                        .atZone(ZoneId.systemDefault())
+                        .format(DateTimeFormatter.ofPattern("HH:mm"))
                 }
                 Text(
-                    text = "Sync: $syncTime",
-                    fontSize = 10.sp,
+                    text = "Next Sync: $syncTime",
+                    fontSize = 11.sp,
                     color = Color.Black.copy(alpha = 0.3f),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                        .padding(top = 45.dp, end = 12.dp)
                         .zIndex(10f)
                 )
             }
             
             Column(modifier = Modifier.padding(16.dp)) {
             Spacer(Modifier.height(15.dp)) // Lowered main heading (5dp + 10dp)
-            val effectiveTitle = if (Repository.stageMembers.isNotEmpty()) Repository.playTitle else settings.headerText
+            val effectiveTitle = if (isMeetingActive || Repository.stageMembers.isEmpty()) settings.headerText else Repository.playTitle
             
             Box(modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -384,34 +397,112 @@ fun SignInScreen(
                         }
                     }
 
-                    // Warehouse Mode Push Button
+                    // Warehouse Mode Push Button (Cycles: 0=GPT, 1=YT, 2=Meeting)
                     if (settings.warehouseModeEnabled) {
+                        val isCastSignedIn = Repository.stageActive.isNotEmpty()
+                        val currentState = settings.warehouseState
+                        val buttonText = when(currentState) {
+                            1 -> "YT"
+                            2 -> "M"
+                            else -> "GPT"
+                        }
+                        val buttonColor = when(currentState) {
+                            2 -> Color(0xFF2196F3) // Bright blue for meeting ON
+                            1 -> Color(0xFFFFD54F) // Modern amber/yellow for YT
+                            else -> Color(0xFF81C784) // Modern green for GPT
+                        }
                         Button(
                             onClick = {
                                 Repository.updateActivityTime()
-                                val newState = !settings.isWarehouseActive
-                                Repository.updateSettings { it.copy(isWarehouseActive = newState) }
-                                // Trigger refresh to load the correct worksheet
+                                val nextState = (currentState + 1) % 3
+                                Repository.updateSettings { it.copy(warehouseState = nextState) }
+                                val modeName = when(nextState) { 1 -> "YT"; 2 -> "Meeting"; else -> "GPT" }
+                                Repository.logAdminEvent("Warehouse button pressed: $modeName")
                                 repositoryScope.launch {
                                     Repository.refreshAllFromPersistedUris()
                                 }
                             },
+                            enabled = !isCastSignedIn,
                             modifier = Modifier
-                                .width(80.dp)
-                                .height(56.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Color.Gray),
+                                .width(84.dp)
+                                .height(56.dp)
+                                .shadow(
+                                    elevation = if (currentState == 2) 6.dp else 2.dp,
+                                    shape = RoundedCornerShape(10.dp),
+                                    clip = false
+                                ),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = Color.Black.copy(alpha = 0.2f)
+                            ),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (settings.isWarehouseActive) Color(0xFFFED101) else Color(0xFFBEE9AD),
-                                contentColor = Color.Black
+                                containerColor = buttonColor,
+                                contentColor = if (currentState == 2) Color.White else Color.Black,
+                                disabledContainerColor = Color.LightGray,
+                                disabledContentColor = Color.DarkGray
                             ),
                             contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text(
-                                text = if (settings.isWarehouseActive) "YT" else "GPT",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                textAlign = TextAlign.Center
+                            if (currentState == 2) {
+                                Icon(
+                                    imageVector = Icons.Default.Groups,
+                                    contentDescription = "Meeting Mode",
+                                    modifier = Modifier.size(28.dp),
+                                    tint = Color.White
+                                )
+                            } else {
+                                Text(
+                                    text = buttonText,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+
+                    // Meeting Mode Push Button (Only allowed in Normal mode - NOT Warehouse)
+                    if (settings.meetingModeEnabled && !settings.warehouseModeEnabled) {
+                        val isCastSignedIn = Repository.stageActive.isNotEmpty()
+                        val meetingActive = settings.meetingButtonActive
+                        // Off state is 2 shades lighter than On state (#90CAF9 vs #2196F3)
+                        val meetingColor = if (meetingActive) Color(0xFF2196F3) else Color(0xFF90CAF9)
+                        Button(
+                            onClick = {
+                                Repository.updateActivityTime()
+                                val newActive = !meetingActive
+                                val activationTime = if (newActive) System.currentTimeMillis() else 0L
+                                Repository.updateSettings { it.copy(meetingButtonActive = newActive, meetingActivatedTimestamp = activationTime) }
+                                Repository.logAdminEvent("Meeting mode toggled: ${if (newActive) "ON" else "OFF"}")
+                            },
+                            enabled = !isCastSignedIn,
+                            modifier = Modifier
+                                .width(84.dp)
+                                .height(56.dp)
+                                .shadow(
+                                    elevation = if (meetingActive) 6.dp else 2.dp,
+                                    shape = RoundedCornerShape(10.dp),
+                                    clip = false
+                                ),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = Color.Black.copy(alpha = 0.2f)
+                            ),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = meetingColor,
+                                contentColor = if (meetingActive) Color.White else Color(0xFF0D47A1),
+                                disabledContainerColor = Color.LightGray,
+                                disabledContentColor = Color.DarkGray
+                            ),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Groups,
+                                contentDescription = "Meeting Mode",
+                                modifier = Modifier.size(28.dp),
+                                tint = if (meetingActive) Color.White else Color(0xFF0D47A1)
                             )
                         }
                     }

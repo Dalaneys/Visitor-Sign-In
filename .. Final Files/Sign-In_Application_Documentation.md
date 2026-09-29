@@ -85,7 +85,7 @@ Sign-In v4.0 is a robust digital attendance system designed for professional env
 
 ## 8. Data Management & File Layouts (`Documents/Sign-In Data/`)
 
-All files must be in Excel (`.xlsx`) format and stored in `Documents/Sign-In Data/`.
+All files must be in Excel (`.xlsx`) format and stored in `Documents/Sign-In Data/`. Upload buttons in Admin are arranged into 3 large, equal-width buttons: **"Cast"**, **"Members"**, and **"In App Lists"**.
 
 ### Cast File (RH Side)
 - **Row 1**: Play Title.
@@ -97,14 +97,28 @@ All files must be in Excel (`.xlsx`) format and stored in `Documents/Sign-In Dat
 - **Column B**: Last Name.
 *(The app automatically sorts members alphabetically and computes the dynamic midpoint split letter for Dark mode panels).*
 
-### Roles & Locations Files
-- **Column A**: Role or Location names (Row 2+).
-
-### Titles & Questions Files
-- **Column B**: Configuration rows.
+### In App Lists File (Single Combined Workbook with 4 Worksheets)
+- **Locations Worksheet**:
+  - **Cell A1**: Inputbox Label.
+  - **Cells A2:A20**: Theatre Locations.
+  - **Cells A21:A30**: Warehouse Locations.
+- **Roles Worksheet**:
+  - **Cell A1**: Inputbox Label.
+  - **Cells A2:A20**: Theatre Roles.
+  - **Cells A21:A30**: Warehouse Roles.
+- **Questions Worksheet** *(No header row)*:
+  - **Cells B1–B14**: Last Person Sign-Out Checklist Text (up to 14 checklist questions).
+  - **Cells B15–B16**: Reminder Pop-Up Message (Line 1 = B15, Line 2 = B16).
+  - **Cell B17**: Theatre Meeting Duration hours (`1–24`).
+  - **Cell B18**: Warehouse Meeting Duration hours (`1–24`).
+- **Titles Worksheet**:
+  - **Cell B2**: Default Play Title / Main Header.
+  - **Cell B3**: Left Panel Heading.
+  - **Cell B4**: Right Panel Heading.
+  - **Cell B5**: Screen Saver Message.
 
 ### Warehouse Mode
-- When Warehouse Mode is enabled in Admin, the app switches to Warehouse worksheets and enables the `GPT` / `YT` toggle button on the sign-in form.
+- When Warehouse Mode is enabled in Admin, active Locations and Roles are loaded from Cells A21:A30 of the Locations/Roles worksheets. On the main screen, the push button cycles through 3 steps: `GPT` (0) ➔ `YT` (1) ➔ `Meeting` (2).
 
 ---
 
