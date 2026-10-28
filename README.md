@@ -1,4 +1,4 @@
-# Sign-In v4.2 – User & Technical Guide
+# Sign-In v4.3 – User & Technical Guide
 
 This guide explains how to use and maintain the Sign-In application.
 
@@ -8,7 +8,7 @@ This guide explains how to use and maintain the Sign-In application.
 
 - **[Version & Branding]**
   - **Minimal UI:** The main screen is designed to be as clean as possible. Top corners are intentionally left empty.
-  - **Next Sync Indicator:** A discreet timestamp in the top-right corner displays **"Next Sync: [HH:mm]"** (11.sp font size), indicating when the next scheduled 4-hour background data sync will occur.
+  - **Real-Time Event Export:** Sign-in and sign-out records are exported instantly in real-time as events occur. `MediaScannerConnection` notifications update file metadata on disk instantly so cloud sync tools (like AutoSync / DriveSync) capture uploads immediately before ScreenSaver / Doze mode.
   - **Admin Access:** To access settings, type your 4-digit PIN (default **1925**) into the **Name** input box. This will immediately navigate to the Admin area.
 
 - **[Signing In & Safeguards]**
@@ -40,31 +40,32 @@ This guide explains how to use and maintain the Sign-In application.
 - **[Data Management, Warehouse & Meeting Modes]**
   - **Upload Buttons:** The Admin screen features 3 large, evenly-sized, wrapped-text upload buttons: **"Cast"**, **"Members"**, and **"In App Lists"**.
   - **Database & Workbook Files:**
-    - **Cast:** Row 1 = Title, Row 2 = Last Performance Date (dd/mm/yyyy format), Row 3+ = Names.
+    - **Cast:** Worksheets `Location #1`, `Location #2 - A`, `Location #2 - B`. Row 1 = Title, Row 2 = Last Performance Date (dd/mm/yyyy format), Row 3+ = Names.
     - **Members:** Column A (First Name) & Column B (Last Name).
     - **In App Lists (Single Combined Workbook with 4 Worksheets):**
       - **Locations Worksheet:** Cell A1 = Inputbox Label, Cells A2:A20 = Theatre Locations, Cells A21:A30 = Warehouse Locations.
       - **Roles Worksheet:** Cell A1 = Inputbox Label, Cells A2:A20 = Theatre Roles, Cells A21:A30 = Warehouse Roles.
       - **Questions Worksheet (No header row):** Column B (Cells B1–B14: Last Person Sign-Out Checklist Text, Cells B15–B16: Reminder Pop-Up Message, Cell B17: Theatre Meeting Duration Hours `1-24`, Cell B18: Warehouse Meeting Duration Hours `1-24`).
       - **Titles Worksheet:** Column B (Cell B2: Default Play Title / Main Header, Cell B3: Left Panel Heading, Cell B4: Right Panel Heading, Cell B5: Screen Saver Message).
-  - **Modes (Warehouse & Meeting):** In Admin under "Modes", toggle **Warehouse Enable** or **Meeting Mode** (mutually exclusive).
-    - In Warehouse mode, active Locations and Roles are loaded automatically from Cells A21:A30 of the Locations/Roles worksheets. The main screen push button cycles through 3 steps: **GPT** (0) ➔ **YT** (1) ➔ **Meeting** (2, with meeting icon and bright blue background).
+  - **Modes (Loc'n 2 Enable & Meeting Mode):** In Admin under "Modes", toggle **Loc'n 2 Enable** or **Meeting Mode** (mutually exclusive).
+    - In Loc'n 2 mode, active Locations and Roles are loaded automatically from Cells A21:A30 of the Locations/Roles worksheets. The main screen push button cycles through 3 steps: **🎭 #1** (0) ➔ **🎭 #2** (1) ➔ **👥 Meeting** (2, with groups icon and bright blue background).
     - In Normal mode, active Locations and Roles are loaded from Cells A2:A20. Toggling Meeting mode displays the meeting push button (Off state is 2 shades lighter than On state).
-    - **Remote Meeting Durations (Cells B17 & B18):** Theatre meeting duration (`1-24` hours) is controlled remotely by cell **B17**, and Warehouse meeting duration (`1-24` hours) is controlled remotely by cell **B18** in the Questions sheet of "In App Lists". Both values are visibly displayed as unchangeable read-only status indicators on the Admin screen. Meeting mode automatically deactivates after the respective configured hours have elapsed since activation.
+    - **Remote Meeting Durations (Cells B17 & B18):** Loc'n 1 meeting duration (`1-24` hours) is controlled remotely by cell **B17**, and Loc'n 2 meeting duration (`1-24` hours) is controlled remotely by cell **B18** in the Questions sheet of "In App Lists". Both values are displayed as `Loc'n 1:` and `Loc'n 2:` indicators on the Admin screen (`Duration: Questions B17 & B18`). Meeting mode automatically deactivates after the respective configured hours have elapsed since activation.
     - **Admin Logging & Change Detection:** When "In App Lists" is updated or changed, background observers re-read all 4 worksheets and record an Admin Log entry detailing the worksheet change.
     - **"Signed in Cast member is King"**: If any cast member is checked in (`stageActive`), the Meeting button is automatically disabled in both modes.
   - **Automated Reset:** If Row 2 of the Cast file has a date that has passed (evaluated at the scheduled Auto Signout Time, default 04:00), the app automatically resets the Cast list and title.
 
 - **[Automation, Logs & Retention]**
   - **Daily Maintenance & Auto Signout:** Scheduled at your choice (default **04:00**) to sign out everyone and refresh databases.
-  - **Log Save Folder & Single Daily Record Updates:** Designated under **Log Save Folder (Saved every 4 hours)**. Rather than creating multiple files per day, the app creates exactly **one file per day** (`Records_YYYY-MM-DD.txt`) in the Records subfolder and updates it in place every 4 hours with all sign-ins and sign-outs from the day (previous 24 hours), complete with an explicit UK datestamp (`dd-MM-yyyy`) on every row.
+  - **Log Save Folder Subfolders:** All external files are organized into dedicated subfolders:
+    - **`Records/Records_YYYY-MM-DD.txt`**: Daily attendance records for the operational 24-hour day (04:01 AM to 04:00 AM next day).
+    - **`Admin Logs/Admin_logs_YYYY-MM-DD.txt`**: System and administrative event logs.
   - **Log File Retention & Storage:** 
-    - **Admin Logs:** Retained for **30 days** (older files are pruned). Admin logs record **only** PIN changes and actual database/file updates.
-    - **Sign-In History / Records:** Retained for **30 days**.
+    - **Retention**: Admin logs and sign-in records are retained for **30 days** (older files are pruned).
     - **Storage Consumption:** Extremely lightweight, consuming **less than 20 MB total**.
   - **Unselected Log Folder Behavior:** If no log save folder is selected, core sign-in, database loading/saving, and local in-app history operate normally; external text log files and daily export files are simply skipped until a folder is designated.
   - **Display Over Other Apps (Auto-Start):** Required for automatic startup over the lock screen. If grayed out on Android 11+, tap the top-right three dots (`⋮`) and select **"Allow restricted settings"** first.
-  - **Tablet Auto-Restart & Battery Optimization Note:** On certain tablets (Samsung, Lenovo, etc.), OEM battery management may terminate apps launched automatically via boot receivers. To ensure the app stays running after reboot, go to **Settings > Apps > Sign-In v4.2 > Battery**, set it to **"Unrestricted"**, and enable **Auto-start / Allow background activity** in device care.
+  - **Tablet Auto-Restart & Battery Optimization Note:** On certain tablets (Samsung, Lenovo, etc.), OEM battery management may terminate apps launched automatically via boot receivers. To ensure the app stays running after reboot, go to **Settings > Apps > Sign-In v4.3 > Battery**, set it to **"Unrestricted"**, and enable **Auto-start / Allow background activity** in device care.
 
 ---
 
@@ -74,4 +75,4 @@ This guide explains how to use and maintain the Sign-In application.
 - **Architecture:** `Repository.kt` as Single Source of Truth.
 - **Persistence:** All databases are persisted locally in JSON format to ensure offline availability.
 - **Excel Processing:** Powered by **Apache POI**. All data files are expected in Documents.
-- **Footer Branding:** Created by Stu Sorrell, v4.2.2026.10
+- **Footer Branding:** Created by Stu Sorrell, v4.3.2026.10

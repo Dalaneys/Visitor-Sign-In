@@ -9,6 +9,7 @@ import android.content.ContentValues
 import android.graphics.Color
 import java.io.File
 import android.net.Uri
+import android.media.MediaScannerConnection
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +42,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 object Repository {
-    const val VERSION = "v4.2"
+    const val VERSION = "v4.3"
     private lateinit var appContext: Context
     private val repositoryScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private const val PREFS_NAME = "signing_prefs"
@@ -433,11 +434,46 @@ object Repository {
                 try {
                     val treeUri = android.net.Uri.parse(uriStr)
                     val treeId = DocumentsContract.getTreeDocumentId(treeUri)
-                    val rootUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId)
+                    val parentDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId)
+
+                    // 1. Ensure "Admin Logs" subfolder exists
+                    var adminLogsFolderUri: android.net.Uri? = null
                     val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, treeId)
-                    
+                    appContext.contentResolver.query(
+                        childrenUri,
+                        arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE),
+                        null, null, null
+                    )?.use { cursor ->
+                        val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                        val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                        val mimeCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                        if (idCol >= 0 && nameCol >= 0) {
+                            while (cursor.moveToNext()) {
+                                if (cursor.getString(nameCol) == "Admin Logs" && cursor.getString(mimeCol) == DocumentsContract.Document.MIME_TYPE_DIR) {
+                                    val docId = cursor.getString(idCol)
+                                    adminLogsFolderUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                                    break
+                                }
+                            }
+                        }
+                    }
+
+                    if (adminLogsFolderUri == null) {
+                        adminLogsFolderUri = DocumentsContract.createDocument(appContext.contentResolver, parentDocUri, DocumentsContract.Document.MIME_TYPE_DIR, "Admin Logs")
+                    }
+
+                    if (adminLogsFolderUri == null) return@synchronized
+
+                    // 2. Find or create target log file inside "Admin Logs" subfolder
+                    val adminLogsDocId = DocumentsContract.getDocumentId(adminLogsFolderUri!!)
+                    val adminLogsChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, adminLogsDocId)
+
                     var fileUri: android.net.Uri? = null
-                    appContext.contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    appContext.contentResolver.query(
+                        adminLogsChildrenUri,
+                        arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                        null, null, null
+                    )?.use { cursor ->
                         val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
                         val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
                         if (idCol >= 0 && nameCol >= 0) {
@@ -452,7 +488,7 @@ object Repository {
                     }
 
                     if (fileUri == null) {
-                        fileUri = DocumentsContract.createDocument(appContext.contentResolver, rootUri, "text/plain", targetFileName)
+                        fileUri = DocumentsContract.createDocument(appContext.contentResolver, adminLogsFolderUri!!, "text/plain", targetFileName)
                     }
 
                     if (fileUri != null) {
@@ -466,11 +502,32 @@ object Repository {
                         appContext.contentResolver.openOutputStream(fileUri!!, "wt")?.use { out ->
                             out.bufferedWriter().use { it.write(updatedText) }
                         }
+                        notifyMediaScanner(fileUri)
                     }
                 } catch (e: Exception) {
                     Log.e("Repository", "Failed to write admin log: ${e.message}", e)
                 }
             }
+        }
+    }
+
+    private fun notifyMediaScanner(fileUri: Uri?) {
+        if (fileUri == null || !::appContext.isInitialized) return
+        runCatching {
+            val path = fileUri.path
+            val pathString = if (!path.isNullOrBlank()) {
+                if (path.contains(":")) {
+                    val relPath = path.substringAfter(":")
+                    val storageRoot = Environment.getExternalStorageDirectory().path
+                    if (relPath.startsWith("/")) "$storageRoot$relPath" else "$storageRoot/$relPath"
+                } else path
+            } else fileUri.toString()
+
+            MediaScannerConnection.scanFile(appContext, arrayOf(pathString, fileUri.toString()), null) { scannedPath, _ ->
+                Log.d("Repository", "MediaScanner refreshed file metadata for AutoSync: $scannedPath")
+            }
+        }.onFailure { e ->
+            Log.w("Repository", "MediaScanner notification warning: ${e.message}")
         }
     }
 
@@ -483,23 +540,40 @@ object Repository {
         val thirtyDaysAgo = now.minusDays(30)
 
         try {
-            val treeUri = android.net.Uri.parse(uriStr)
-            val treeId = DocumentsContract.getTreeDocumentId(treeUri)
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, treeId)
+            val parentUri = Uri.parse(uriStr)
+            val parentId = DocumentsContract.getTreeDocumentId(parentUri)
+            
+            // Find "Admin Logs" subfolder ID
+            var adminLogsFolderId: String? = null
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, parentId)
+            appContext.contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                while (cursor.moveToNext()) {
+                    if (cursor.getString(nameCol) == "Admin Logs" && cursor.getString(mimeCol) == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        adminLogsFolderId = cursor.getString(idCol)
+                        break
+                    }
+                }
+            }
 
-            appContext.contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
+            val folderId = adminLogsFolderId ?: return
+            val adminLogsChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, folderId)
+
+            appContext.contentResolver.query(adminLogsChildrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
                 val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
                 val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
                 if (idCol >= 0 && nameCol >= 0) {
                     while (cursor.moveToNext()) {
                         val name = cursor.getString(nameCol) ?: continue
                         if (name.startsWith("Admin_logs_") && name.endsWith(".txt")) {
-                            val dateStr = name.substringAfter("Admin_logs_").substringBefore(".txt")
+                            val dateStr = name.substringAfter("Admin_logs_").substringBefore(" ").substringBefore(".txt")
                             runCatching {
                                 val fileDate = java.time.LocalDate.parse(dateStr)
                                 if (fileDate.isBefore(thirtyDaysAgo)) {
                                     val docId = cursor.getString(idCol)
-                                    val fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                                    val fileUri = DocumentsContract.buildDocumentUriUsingTree(parentUri, docId)
                                     DocumentsContract.deleteDocument(appContext.contentResolver, fileUri)
                                     Log.d("Repository", "Deleted old admin log file: $name")
                                 }
@@ -514,7 +588,20 @@ object Repository {
     }
 
     /**
-     * Saves sign-in records for that day (previous 24hrs) to a daily record file in a "Records" subfolder.
+     * Calculates the operational 24-hour date for a given timestamp based on the admin auto maintenance time.
+     * The operational day starts 1 minute past auto maintenance time (e.g. 04:01 AM) and ends at maintenance time (04:00 AM) the next day.
+     */
+    fun getOperationalDate(epochMillis: Long): java.time.LocalDate {
+        val zone = ZoneId.systemDefault()
+        val dt = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), zone)
+        val cutoffHour = settings.dailyJobHour.coerceIn(0, 23)
+        val cutoffMin = settings.dailyJobMinute.coerceIn(0, 59)
+        val cutoff = dt.toLocalDate().atTime(cutoffHour, cutoffMin)
+        return if (dt.isBefore(cutoff)) dt.toLocalDate().minusDays(1) else dt.toLocalDate()
+    }
+
+    /**
+     * Saves sign-in records for the current operational 24-hour day to a record file in "Records" subfolder.
      */
     fun saveDailyRecordFile() {
         if (!::appContext.isInitialized) return
@@ -548,9 +635,10 @@ object Repository {
 
                 if (recordsFolderUri == null) return@launch
 
-                // 2. Find or create single daily record file for today
+                // 2. Find or create single daily record file for current operational date
                 val now = java.time.LocalDateTime.now()
-                val fileName = "Records_${now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))}.txt"
+                val currentOpDate = getOperationalDate(System.currentTimeMillis())
+                val fileName = "Records_${currentOpDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))}.txt"
                 
                 var existingRecordFileUri: android.net.Uri? = null
                 val recordsFolderDocId = DocumentsContract.getDocumentId(recordsFolderUri!!)
@@ -580,10 +668,11 @@ object Repository {
                     fileName
                 ) ?: return@launch
 
-                // Filter history to only include records from the previous 24 hours (that day)
-                val cutoff24h = System.currentTimeMillis() - 24L * 3600L * 1000L
+                // Filter history to include records belonging to the current operational 24-hour window
                 val historyRecords = history.filter { e ->
-                    e.arrivalEpochMillis >= cutoff24h || e.departureEpochMillis >= cutoff24h
+                    val opDateIn = getOperationalDate(e.arrivalEpochMillis)
+                    val opDateOut = if (e.departureEpochMillis > 0L) getOperationalDate(e.departureEpochMillis) else opDateIn
+                    opDateIn == currentOpDate || opDateOut == currentOpDate
                 }
 
                 // Currently active visitor sign-ins
@@ -608,12 +697,21 @@ object Repository {
                     )
                 }
 
-                // Combine active records and history records, sorted by arrival time
+                // Combine active records and history records for the operational day
                 val allDayRecords = (activeVisitorRecords + activeCastRecords + historyRecords)
+                    .distinctBy { Pair(it.name, it.arrivalEpochMillis) }
                     .sortedBy { it.arrivalEpochMillis }
 
+                val cutoffHour = settings.dailyJobHour.coerceIn(0, 23)
+                val cutoffMin = settings.dailyJobMinute.coerceIn(0, 59)
+                val opStartDt = currentOpDate.atTime(cutoffHour, cutoffMin).plusMinutes(1)
+                val opEndDt = currentOpDate.plusDays(1).atTime(cutoffHour, cutoffMin)
+                val startStr = opStartDt.format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"))
+                val endStr = opEndDt.format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"))
+                val opDateStr = currentOpDate.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"))
+
                 val content = buildString {
-                    append("Sign-In Records for ${now.toLocalDate().format(DateTimeFormatter.ofPattern("dd-MM-yyyy"))} (Real-Time Daily Record)\n")
+                    append("Sign-In Records for $opDateStr (Operational Day: $startStr to $endStr)\n")
                     append("Generated at: ${now.format(DateTimeFormatter.ofPattern("HH:mm:ss"))}\n")
                     append("-".repeat(67) + "\n")
                     append(String.format("%-25s %-20s %-12s %-8s %-10s %-12s\n", "Name", "Role/Loc", "Date", "In", "Out", "Reg"))
@@ -639,7 +737,8 @@ object Repository {
                 appContext.contentResolver.openOutputStream(recordFileUri, "wt")?.use { out ->
                     out.bufferedWriter().use { it.write(content) }
                 }
-                Log.d("Repository", "Daily record updated in real-time: $fileName (${allDayRecords.size} total records)")
+                notifyMediaScanner(recordFileUri)
+                Log.d("Repository", "Operational daily record updated: $fileName (${allDayRecords.size} total records)")
             } catch (e: Exception) {
                 Log.e("Repository", "Failed to save daily record: ${e.message}", e)
             }
@@ -1627,7 +1726,14 @@ object Repository {
             // PASSIVE RESET CHECK: Always check date first
             checkAndApplyPassiveReset()
 
-            val namesSheets = if (!settings.warehouseModeEnabled) listOf("Theatre") else (when (settings.warehouseState) { 1 -> listOf("Youth"); else -> listOf("Rehearsals") })
+            val namesSheets = if (!settings.warehouseModeEnabled) {
+                listOf("Location #1", "Theatre")
+            } else {
+                when (settings.warehouseState) {
+                    1 -> listOf("Location #2 - B", "Location #2 - A", "Location #2 Play 2", "Youth")
+                    else -> listOf("Location #2 - A", "Location #2 Play 1", "Rehearsals")
+                }
+            }
             val rolesSheets = if (!settings.warehouseModeEnabled) listOf("Role") else listOf("Warehouse Roles")
             val locsSheets = if (!settings.warehouseModeEnabled) listOf("Locations") else listOf("Warehouse")
 
@@ -1790,7 +1896,14 @@ object Repository {
             }
             
             // Names: resolve, check openability, then compare MediaStore ID, last-modified, and first 1000 lines hash
-            val namesSheets = if (!settings.warehouseModeEnabled) listOf("Theatre") else (when (settings.warehouseState) { 1 -> listOf("Youth"); else -> listOf("Rehearsals") })
+            val namesSheets = if (!settings.warehouseModeEnabled) {
+                listOf("Location #1", "Theatre")
+            } else {
+                when (settings.warehouseState) {
+                    1 -> listOf("Location #2 - B", "Location #2 - A", "Location #2 Play 2", "Youth")
+                    else -> listOf("Location #2 - A", "Location #2 Play 1", "Rehearsals")
+                }
+            }
             val rolesSheets = if (!settings.warehouseModeEnabled) listOf("Role") else listOf("Warehouse Roles")
             val locsSheets = if (!settings.warehouseModeEnabled) listOf("Locations") else listOf("Warehouse")
 

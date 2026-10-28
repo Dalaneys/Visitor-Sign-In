@@ -1,4 +1,4 @@
-# Sign-In Application v4.2 - Professional Documentation
+# Sign-In Application v4.3 - Professional Documentation
 
 ## Table of Contents
 1. Overview
@@ -11,14 +11,13 @@
 8. Data Management & File Layouts (Cast, Roles, Locations, Warehouse, Meeting)
 9. Special Input Codes
 10. Log Retention & Maintenance
-11. Troubleshooting
-12. Technical Specifications
+11. Technical Specifications
 
 ---
 
 ## 1. Overview
 
-Sign-In v4.2 is a robust digital attendance system designed for professional environments like theatre companies and offices. It features real-time tracking, full offline persistence, automated data management via synced Excel files, custom theme color engine, Warehouse 3-step cycle mode, separate remote-controlled Meeting timers for Theatre (cell B17) and Warehouse (cell B18), 30-day strict retention, UK datestamped 24-hr record saves, and robust sign-in safeguards.
+Sign-In v4.3 is a robust digital attendance system designed for professional environments like theatre companies and offices. It features real-time tracking, full offline persistence, automated data management via synced Excel files, custom theme color engine, Loc'n 2 3-step cycle mode, separate remote-controlled Meeting timers for Loc'n 1 (cell B17) and Loc'n 2 (cell B18), operational 24-hour day record saving (04:01 AM to 04:00 AM next day), subfolder log organization (`Records/` and `Admin Logs/`), 30-day strict retention, real-time MediaScanner cloud-sync notifications, and robust sign-in safeguards.
 
 ---
 
@@ -40,11 +39,11 @@ Sign-In v4.2 is a robust digital attendance system designed for professional env
 - **Restricted Settings Override**: On Android 11+ tablets where the permission switch appears grayed out or disabled:
   1. Tap the **three dots (`⋮`)** at the top right corner of the Android settings screen.
   2. Select **"Allow restricted settings"**.
-  3. Return to the settings page and enable the permission toggle for Sign-In v4.2.
+  3. Return to the settings page and enable the permission toggle for Sign-In v4.3.
 
 ### Tablet Auto-Restart & Battery Optimization Note
 - On certain tablets (Samsung, Lenovo, etc.), OEM background process managers may terminate apps launched automatically via boot receivers. 
-- **Action**: Go to **Settings > Apps > Sign-In v4.2 > Battery**, set it to **"Unrestricted"**, and enable **Auto-start / Allow background activity** in device settings.
+- **Action**: Go to **Settings > Apps > Sign-In v4.3 > Battery**, set it to **"Unrestricted"**, and enable **Auto-start / Allow background activity** in device settings.
 
 ---
 
@@ -74,10 +73,10 @@ Sign-In v4.2 is a robust digital attendance system designed for professional env
 - Go to **Admin > Appearance**, tap **Click to change** on the right of the tile, and use the built-in **RGB Color Sliders** engine to choose any custom theme color.
 - **Automatic High-Contrast Text**: Text elements (headers, titles, instructions) automatically switch to crisp white on dark backgrounds and black on light backgrounds based on perceptual luminance.
 
-### 6.2 Modes (Warehouse Enable & Meeting Mode)
-- In Admin under **Modes**, toggle **Warehouse Enable** or **Meeting Mode** (mutually exclusive).
-- **Warehouse 3-Step Button Cycle**: Cycles through **GPT** (0) ➔ **YT** (1) ➔ **Meeting** (2, displaying meeting icon and bright blue background).
-- **Meeting Mode & Remote Durations (Cells B17 & B18)**: Theatre meeting duration (`1-24` hours) is controlled remotely by cell **B17**, and Warehouse meeting duration (`1-24` hours) is controlled remotely by cell **B18** in the Questions Excel file. Both values are visibly displayed as unchangeable read-only status indicators on the Admin screen. Meeting mode automatically deactivates after the respective configured hours have elapsed since activation.
+### 6.2 Modes (Loc'n 2 Enable & Meeting Mode)
+- In Admin under **Modes**, toggle **Loc'n 2 Enable** or **Meeting Mode** (mutually exclusive).
+- **Loc'n 2 3-Step Button Cycle**: Cycles through **🎭 #1** (0) ➔ **🎭 #2** (1) ➔ **👥 Meeting** (2, displaying meeting icon and bright blue background).
+- **Meeting Mode & Remote Durations (Cells B17 & B18)**: Loc'n 1 meeting duration (`1-24` hours) is controlled remotely by cell **B17**, and Loc'n 2 meeting duration (`1-24` hours) is controlled remotely by cell **B18** in the Questions sheet of "In App Lists". Both values are displayed as `Loc'n 1:` and `Loc'n 2:` indicators on the Admin screen (`Duration: Questions B17 & B18`). Meeting mode automatically deactivates after the respective configured hours have elapsed since activation.
 - **"Signed in Cast Member is King"**: If any cast member is checked in (`stageActive`), the Meeting button is automatically disabled in both modes.
 
 ---
@@ -95,6 +94,7 @@ Sign-In v4.2 is a robust digital attendance system designed for professional env
 All files must be in Excel (`.xlsx`) format. In Admin, files are uploaded via 3 large, equal-width buttons: **"Cast"**, **"Members"**, and **"In App Lists"**.
 
 ### Cast File (RH Side)
+- **Worksheet Names**: `Location #1` (Loc'n 1 / Theatre), `Location #2 - A` (Loc'n 2 Play A / Rehearsals), `Location #2 - B` (Loc'n 2 Play B / Youth).
 - **Row 1**: Play Title.
 - **Row 2**: **Last Performance Date** (dd/mm/yyyy format). If today is after this date, the list resets automatically during maintenance (default 04:00 AM).
 - **Row 3+**: Names.
@@ -137,8 +137,10 @@ Entered into the **Name** input box:
 ---
 
 ## 10. Log Retention & Maintenance
-- **Log Save Folder & Single Daily Record Updates**: Designated under **Log Save Folder (Saved every 4 hours)**. The app creates exactly **one record file per day** (`Records_YYYY-MM-DD.txt`) in the Records subfolder. When background auto-saves run every 4 hours, that single daily file is updated in place with all sign-ins and sign-outs for the day (previous 24 hours), complete with an explicit UK datestamp (`dd-MM-yyyy`) on every record row. This prevents duplicate numbered files (`Records_... (1).txt`).
-- **Admin Logs & Sign-In History Retention**: Retained for **30 days** (older text log files and daily records are automatically pruned). Admin logs record **only** PIN changes and actual database/file updates.
+- **Subfolder File Organization**: All external files are cleanly organized into dedicated subfolders inside your designated **Log Save Folder**:
+  - **`[Log Save Folder]/Records/Records_YYYY-MM-DD.txt`**: Sign-in/out records for each operational 24-hour day (04:01 AM to 04:00 AM next day).
+  - **`[Log Save Folder]/Admin Logs/Admin_logs_YYYY-MM-DD.txt`**: Administrative event logs (PIN changes, settings saves, file updates).
+- **Log Retention**: Both attendance records and admin logs are retained for **30 days** (older text files are automatically pruned).
 - **Storage Consumption**: Extremely lightweight, consuming **less than 20 MB total**.
 - **Unselected Log Folder Behavior**: If no log save folder is selected in Admin, core sign-in, database loading/saving, and local history operate normally; external text log files and daily export files are simply skipped until a folder is designated.
 
@@ -146,8 +148,8 @@ Entered into the **Name** input box:
 
 ## 11. Technical Specifications
 - **Framework**: Kotlin / Jetpack Compose.
-- **Versioning**: v4.2 - October 2026 Release.
+- **Versioning**: v4.3 - October 2026 Release.
 - **Storage**: Full JSON local persistence for all databases.
 - **Excel Library**: Apache POI.
 - **Background Work**: Android WorkManager for 4-hour refreshes/saves and daily maintenance at 04:00 AM.
-- **Admin Footer Branding**: Created by Stu Sorrell, v4.2.2026.10
+- **Admin Footer Branding**: Created by Stu Sorrell, v4.3.2026.10

@@ -1,4 +1,4 @@
-# Sign-In Application v4.0 - Professional Documentation
+# Sign-In Application v4.3 - Professional Documentation
 
 ## Table of Contents
 1. Overview
@@ -10,14 +10,13 @@
 7. Visual Color Coding & High-Contrast Text
 8. Data Management & File Layouts (Cast, Roles, Locations, Warehouse)
 9. Special Input Codes
-10. Troubleshooting
-11. Technical Specifications
+10. Technical Specifications
 
 ---
 
 ## 1. Overview
 
-Sign-In v4.0 is a robust digital attendance system designed for professional environments like theatre companies and offices. It features real-time tracking, full offline persistence, automated data management via synced Excel files, dynamic theme modes, and robust sign-in safeguards.
+Sign-In v4.3 is a robust digital attendance system designed for professional environments like theatre companies and offices. It features real-time tracking, full offline persistence, automated data management via synced Excel files, dynamic theme modes, and robust sign-in safeguards.
 
 ---
 
@@ -117,8 +116,8 @@ All files must be in Excel (`.xlsx`) format and stored in `Documents/Sign-In Dat
   - **Cell B4**: Right Panel Heading.
   - **Cell B5**: Screen Saver Message.
 
-### Warehouse Mode
-- When Warehouse Mode is enabled in Admin, active Locations and Roles are loaded from Cells A21:A30 of the Locations/Roles worksheets. On the main screen, the push button cycles through 3 steps: `GPT` (0) ➔ `YT` (1) ➔ `Meeting` (2).
+### Loc'n 2 Mode
+- When Loc'n 2 Mode is enabled in Admin, active Locations and Roles are loaded from Cells A21:A30 of the Locations/Roles worksheets. On the main screen, the push button cycles through 3 steps: `🎭 #1` (0) ➔ `🎭 #2` (1) ➔ `👥 Meeting` (2).
 
 ---
 
@@ -132,7 +131,7 @@ Entered into the **Name** input box:
 
 ## 10. Technical Specifications
 - **Framework**: Kotlin / Jetpack Compose.
-- **Versioning**: v4.0 - September 2026 Release.
+- **Versioning**: v4.3 - October 2026 Release.
 - **Storage**: Full JSON local persistence for all databases.
 - **Excel Library**: Apache POI.
 - **Background Work**: Android WorkManager for hourly refreshes and daily maintenance at 04:00 AM.

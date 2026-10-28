@@ -14,17 +14,17 @@ class DocumentGeneratorTest {
 
     @Test
     fun generateDocx() {
-        val docxFile = File("Sign-In_v4.0_User_Guide.docx")
+        val docxFile = File("Sign-In_v4.3_User_Guide.docx")
         XWPFDocument().use { doc ->
             val p1 = doc.createParagraph()
             val r1 = p1.createRun()
-            r1.setText("Sign-In v4.0 – Professional User & Technical Guide")
+            r1.setText("Sign-In v4.3 – Professional User & Technical Guide")
             r1.isBold = true
             r1.fontSize = 20
             r1.color = "1F4E78"
 
             val pIntro = doc.createParagraph()
-            pIntro.createRun().setText("This comprehensive guide covers installation, configuration, themes, data management, tablet auto-start troubleshooting, and sign-in safeguards for Sign-In v4.0.")
+            pIntro.createRun().setText("This comprehensive guide covers installation, configuration, themes, data management, tablet auto-start troubleshooting, and sign-in safeguards for Sign-In v4.3.")
 
             addSection(doc, "1. Main Screen & Sign-In Safeguards", listOf(
                 "Name entry with predictive dropdown from the Members database.",
@@ -41,7 +41,7 @@ class DocumentGeneratorTest {
 
             addSection(doc, "3. Tablet Auto-Start & Battery Optimization", listOf(
                 "App automatically starts up and shows over the lock screen on device reboot.",
-                "Tablet Note: On certain tablets (Samsung, Lenovo, etc.), OEM background process managers may terminate apps launched automatically via boot receivers. To ensure reliability, go to Settings > Apps > Sign-In v4.0 > Battery, set it to 'Unrestricted', and enable Auto-start / Allow background activity in device care."
+                "Tablet Note: On certain tablets (Samsung, Lenovo, etc.), OEM background process managers may terminate apps launched automatically via boot receivers. To ensure reliability, go to Settings > Apps > Sign-In v4.3 > Battery, set it to 'Unrestricted', and enable Auto-start / Allow background activity in device care."
             ))
 
             addSection(doc, "4. Data Management & Warehouse Mode", listOf(

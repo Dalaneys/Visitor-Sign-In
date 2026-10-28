@@ -298,7 +298,7 @@ fun AdminScreen(
                     }
                     AdminTile(title = "Modes", modifier = Modifier.weight(1f).fillMaxHeight()) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Text("Warehouse Enable", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                            Text("Loc'n 2 Enable", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(1f))
                             Switch(
                                 checked = Repository.settings.warehouseModeEnabled,
                                 enabled = !Repository.settings.meetingModeEnabled,
@@ -316,7 +316,7 @@ fun AdminScreen(
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Meeting Mode", fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                                Text("Theatre Duration: ${settings.theatreMeetingDurationHours}h (Questions B17)\nWarehouse Duration: ${settings.warehouseMeetingDurationHours}h (Questions B18)", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                Text("Loc'n 1: ${settings.theatreMeetingDurationHours}h\nLoc'n 2: ${settings.warehouseMeetingDurationHours}h", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                             }
                             Switch(
                                 checked = Repository.settings.meetingModeEnabled,
@@ -327,6 +327,8 @@ fun AdminScreen(
                                 modifier = Modifier.scale(0.9f)
                             )
                         }
+                        Spacer(Modifier.height(4.dp))
+                        Text("Duration: Questions B17 & B18", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -431,24 +433,18 @@ fun AdminScreen(
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Log Save Folder (Saved every 4 hours)", fontWeight = FontWeight.Medium, fontSize = 16.sp)
-                            val folderPathDisplay = if (settings.logFolderUriString == null) {
+                            Text("Log Save Folder", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                            val folderPathDisplay = if (settings.logFolderUriString.isNullOrBlank()) {
                                 "Not Selected"
                             } else {
-                                val rawRel = settings.logFolderRelativePath ?: ""
-                                val disp = settings.logFolderDisplayName ?: ""
-                                val cleanRel = rawRel.removePrefix("/").removePrefix("primary:")
-                                buildString {
-                                    if (cleanRel.isNotBlank()) {
-                                        append(cleanRel)
-                                        if (!cleanRel.endsWith("/") && disp.isNotBlank()) append("/")
-                                    } else {
-                                        append("Documents/Sign-In Data/")
-                                    }
-                                    if (disp.isNotBlank() && !cleanRel.endsWith(disp)) {
-                                        append(disp)
-                                    }
-                                }.trimEnd('/') + "/"
+                                runCatching {
+                                    val treeUri = Uri.parse(settings.logFolderUriString)
+                                    val treeId = android.provider.DocumentsContract.getTreeDocumentId(treeUri)
+                                    val cleanPath = treeId.substringAfter(":", treeId).removePrefix("/")
+                                    if (cleanPath.isNotBlank()) cleanPath.trimEnd('/') + "/" else settings.logFolderDisplayName ?: "Selected Folder"
+                                }.getOrElse {
+                                    settings.logFolderDisplayName ?: "Selected Folder"
+                                }
                             }
                             Text(
                                 text = folderPathDisplay,
@@ -616,7 +612,7 @@ fun AdminScreen(
             }
 
             Text(
-                text = "Created by Stu Sorrell, v4.2.2026.10",
+                text = "Created by Stu Sorrell, v4.3.2026.10",
                 fontSize = 16.sp,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                 color = Color.Gray,

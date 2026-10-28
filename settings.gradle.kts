@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Sign-In v4.0"
+rootProject.name = "Sign-In v4.3"
 include(":app")

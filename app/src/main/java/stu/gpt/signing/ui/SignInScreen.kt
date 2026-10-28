@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.TheaterComedy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -163,9 +164,12 @@ fun SignInScreen(
 
     val isCastSignedIn = Repository.stageActive.isNotEmpty()
     
-    // Check meeting mode duration timeout
+    // Check meeting mode duration timeout continuously while on screen
     LaunchedEffect(Unit) {
-        Repository.checkAndApplyMeetingTimeout()
+        while (true) {
+            Repository.checkAndApplyMeetingTimeout()
+            delay(10_000L)
+        }
     }
 
     val isMeetingActive = (!isCastSignedIn) && (
@@ -199,25 +203,6 @@ fun SignInScreen(
         color = settings.primaryBgColor
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Discreet Next Sync Timestamp (Top-Right)
-            if (settings.lastSyncTime > 0) {
-                val nextSyncMillis = settings.lastSyncTime + (settings.hourlyRefreshInterval * 60 * 1000L)
-                val syncTime = remember(nextSyncMillis) {
-                    Instant.ofEpochMilli(nextSyncMillis)
-                        .atZone(ZoneId.systemDefault())
-                        .format(DateTimeFormatter.ofPattern("HH:mm"))
-                }
-                Text(
-                    text = "Next Sync: $syncTime",
-                    fontSize = 11.sp,
-                    color = Color.Black.copy(alpha = 0.3f),
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 45.dp, end = 12.dp)
-                        .zIndex(10f)
-                )
-            }
-            
             Column(modifier = Modifier.padding(16.dp)) {
             Spacer(Modifier.height(15.dp)) // Lowered main heading (5dp + 10dp)
             val effectiveTitle = if (isMeetingActive || Repository.stageMembers.isEmpty()) settings.headerText else Repository.playTitle
@@ -401,11 +386,6 @@ fun SignInScreen(
                     if (settings.warehouseModeEnabled) {
                         val isCastSignedIn = Repository.stageActive.isNotEmpty()
                         val currentState = settings.warehouseState
-                        val buttonText = when(currentState) {
-                            1 -> "YT"
-                            2 -> "M"
-                            else -> "GPT"
-                        }
                         val buttonColor = when(currentState) {
                             2 -> Color(0xFF2196F3) // Bright blue for meeting ON
                             1 -> Color(0xFFFFD54F) // Modern amber/yellow for YT
@@ -444,20 +424,55 @@ fun SignInScreen(
                             ),
                             contentPadding = PaddingValues(0.dp)
                         ) {
-                            if (currentState == 2) {
-                                Icon(
-                                    imageVector = Icons.Default.Groups,
-                                    contentDescription = "Meeting Mode",
-                                    modifier = Modifier.size(28.dp),
-                                    tint = Color.White
-                                )
-                            } else {
-                                Text(
-                                    text = buttonText,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    textAlign = TextAlign.Center
-                                )
+                            when (currentState) {
+                                2 -> {
+                                    Icon(
+                                        imageVector = Icons.Default.Groups,
+                                        contentDescription = "Meeting Mode",
+                                        modifier = Modifier.size(28.dp),
+                                        tint = Color.White
+                                    )
+                                }
+                                1 -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.TheaterComedy,
+                                            contentDescription = "Youth Theatre",
+                                            modifier = Modifier.size(22.dp),
+                                            tint = Color.Black
+                                        )
+                                        Spacer(Modifier.width(2.dp))
+                                        Text(
+                                            text = "#2",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color.Black
+                                        )
+                                    }
+                                }
+                                else -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.TheaterComedy,
+                                            contentDescription = "Theatre 1",
+                                            modifier = Modifier.size(22.dp),
+                                            tint = Color.Black
+                                        )
+                                        Spacer(Modifier.width(2.dp))
+                                        Text(
+                                            text = "#1",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color.Black
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

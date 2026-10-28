@@ -127,6 +127,9 @@ private fun AppRoot(onExit: () -> Unit) {
             }
 
             if (Repository.isManualScreenSaver || isAutoScreenSaver.value) {
+                LaunchedEffect(Unit) {
+                    Repository.saveDailyRecordFile()
+                }
                 ScreenSaver(onDismiss = {
                     Repository.isManualScreenSaver = false
                     Repository.updateActivityTime()
@@ -141,7 +144,7 @@ private fun AppRoot(onExit: () -> Unit) {
                         Text(
                             "To ensure the app starts automatically after a tablet reboot, please complete these two setup steps:\n\n" +
                             "1. 'Display over other apps': Enable permission in the next screen (if disabled, tap top-right 3 dots > 'Allow restricted settings').\n\n" +
-                            "2. Battery Optimization: Go to Tablet Settings > Apps > Sign-In v4.0 > Battery, and set it to 'Unrestricted' to prevent background termination.",
+                            "2. Battery Optimization: Go to Tablet Settings > Apps > Sign-In v4.3 > Battery, and set it to 'Unrestricted' to prevent background termination.",
                             fontSize = 15.sp
                         )
                     },
