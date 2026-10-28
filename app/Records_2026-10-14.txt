@@ -1,0 +1,8 @@
+Sign-In Records for 14-10-2026 (Operational Day: 14-10-2026 04:01 to 15-10-2026 04:00)
+Generated at: 01:45:00
+-------------------------------------------------------------------
+Name                      Role/Loc             Date         In       Out        Reg
+Alice Smith               Director             14-10-2026   19:00    01:30      AB12 CDE
+Bob Jones                 Cast                 14-10-2026   19:15    (On-Site)  XY65 ZW
+Charlie Brown             Stage Crew           14-10-2026   19:30    (On-Site)
+Diana Prince              Lighting Tech        14-10-2026   20:00    (On-Site)  AA11 AAA

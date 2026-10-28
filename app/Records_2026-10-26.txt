@@ -1,0 +1,6 @@
+Sign-In Records for 26-10-2026 (Previous 24hrs)
+Generated at: 15:53:29 (Single daily file updated in place)
+-----------------------------------------------------------------
+Name                      Role/Loc             Date         In       Out      Reg         
+Alice Smith               Director             27-10-2026   09:53    12:53    AB12 CDE    
+Bob Jones                 Cast                 26-10-2026   10:53    14:53    XY65 ZW     

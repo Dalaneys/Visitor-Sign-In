@@ -1,0 +1,36 @@
+SIGN-IN v4.2 – INSTALLATION & SETUP INSTRUCTIONS
+=====================================================
+
+1. INITIAL INSTALLATION & AUTO-START SETUP
+------------------------------------------
+When launching Sign-In v4.2 for the first time on your Android tablet, the "Auto-Start Setup" popup will appear.
+To ensure the app opens automatically when the tablet reboots, please complete these two setup steps:
+  1. Display over other apps: Enable permission on the system screen. (If the switch is disabled, tap the 3 dots at the top right of the system screen and select 'Allow restricted settings' first).
+  2. Battery Optimization: Go to Tablet Settings > Apps > Sign-In v4.2 > Battery, and set it to "Unrestricted" to prevent OEM background process managers from terminating the app after reboot.
+
+2. EXCEL DATA STRUCTURE (.xlsx) & IN APP LISTS
+--------------------------------------------
+Sign-In v4.2 integrates with Excel spreadsheets stored in Documents/Sign-In Data/. Upload buttons in Admin are arranged into 3 large, evenly distributed buttons: "Cast", "Members", and "In App Lists".
+  - Cast: Row 1 = Play Title, Row 2 = Last Performance Date (dd/mm/yyyy), Row 3+ = Cast Names.
+  - Members: Column A = First Name, Column B = Last Name.
+  - In App Lists (Single Combined Workbook containing 4 Worksheets):
+      • Locations: Cell A1 = Inputbox Label, Cells A2:A20 = Theatre Locations, Cells A21:A30 = Warehouse Locations.
+      • Roles: Cell A1 = Inputbox Label, Cells A2:A20 = Theatre Roles, Cells A21:A30 = Warehouse Roles.
+      • Questions: Column B (Cells B1–B14 = Last Person Sign-Out Checklist Text [no header row], Cells B15–B16 = Reminder Pop-Up Message, Cell B17 = Theatre Meeting Duration 1-24h, Cell B18 = Warehouse Meeting Duration 1-24h).
+      • Titles: Column B (Cell B2 = Default Play Title / Main Header, Cell B3 = Left Panel Heading, Cell B4 = Right Panel Heading, Cell B5 = Screen Saver Message).
+
+3. THEMES & MODES (WAREHOUSE & MEETING)
+---------------------------------------
+  - Custom Theme Color: Go to Admin > Appearance, tap "Click to change" on the right of the tile, and use the RGB sliders in the custom color engine to pick any custom color.
+  - Next Sync Indicator: The main screen displays "Next Sync: [HH:mm]" in the top-right corner (11.sp font size), tracking the 4-hour background sync interval.
+  - Modes: In Admin under "Modes", toggle **Loc'n 2 Enable** or **Meeting Mode** (mutually exclusive). Duration labels display `Loc'n 1:` (Questions Cell B17) and `Loc'n 2:` (Questions Cell B18).
+  - Loc'n 2 Button: Cycles through 3 steps: 🎭 #1 (0) ➔ 🎭 #2 (1) ➔ 👥 Meeting (2, with groups icon and bright blue background).
+  - Meeting Button: Off state is 2 shades lighter than On state (#90CAF9 vs #2196F3). Loc'n 1 duration is controlled remotely by cell **B17** and Loc'n 2 duration by cell **B18** in the Questions Excel file (1-24 hours) with automatic timeout reset. Both values are visibly displayed as unchangeable read-only indicators on the Admin screen (`Duration: Questions B17 & B18`). Disabled if any cast member is checked in ("Signed in Cast member is King").
+  - Panel Headings: In Meeting / Dark mode, panels display as "Members/Visitors (A-M)" and "Members/Visitors (N-Z)".
+
+4. SIGN-IN SAFEGUARDS & LOG RETENTION
+-----------------------------------
+  - Duplicate Sign-In Safeguard: Prevents checking in twice by displaying an "Already Signed In" warning and resetting the name input box.
+  - Guest Validation: Enforces AA AAA format for guest check-ins.
+  - Log Folder Subfolder Structure: Files are saved into dedicated subfolders under **Log Save Folder**: `Records/Records_YYYY-MM-DD.txt` (Operational 24-hour day attendance) and `Admin Logs/Admin_logs_YYYY-MM-DD.txt` (System & Admin events). Both are retained for **30 days** (< 20 MB total).
+  - Admin Footer: Created by Stu Sorrell, v4.2.2026.10

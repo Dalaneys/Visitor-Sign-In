@@ -1,0 +1,7 @@
+Sign-In Records for 21-10-2026 (Previous 24hrs)
+Generated at: 11:14:49 (Single daily file updated in place)
+-----------------------------------------------------------------
+Name                      Role/Loc             Date         In       Out      Reg         
+Alice Smith               Director             23-10-2026   09:14    12:14    AB12 CDE    
+Bob Jones                 Cast                 22-10-2026   10:14    14:14    XY65 ZW     
+Charlie Brown             Stage Crew           21-10-2026   11:14    15:14                
