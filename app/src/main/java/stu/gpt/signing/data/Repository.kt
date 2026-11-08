@@ -42,7 +42,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 object Repository {
-    const val VERSION = "v4.3"
+    const val VERSION = "v5.0"
     private lateinit var appContext: Context
     private val repositoryScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private const val PREFS_NAME = "signing_prefs"
@@ -156,6 +156,14 @@ object Repository {
     private const val KEY_LOG_FOLDER_RELATIVE_PATH = "logFolderRelativePath"
     private const val KEY_WAREHOUSE_MODE_ENABLED = "warehouseModeEnabled"
     private const val KEY_WAREHOUSE_STATE = "warehouseState"
+    private const val KEY_BATTERY_MONITORING_ENABLED = "batteryMonitoringEnabled"
+    private const val KEY_BATTERY_EMAIL_OVERRIDE = "batteryEmailAddressOverride"
+    private const val KEY_BATTERY_ADMIN_LOG_LEVEL = "batteryAdminLogLevel"
+    private const val KEY_BATTERY_EMAIL_LEVEL = "batteryEmailLevel"
+    private const val KEY_SMTP_HOST = "smtpHost"
+    private const val KEY_SMTP_PORT = "smtpPort"
+    private const val KEY_SMTP_USER = "smtpUser"
+    private const val KEY_SMTP_PASS = "smtpPass"
 
     // Settings (in-memory for now; can be persisted with DataStore later)
     var settings by mutableStateOf(AppSettings())
@@ -1363,7 +1371,19 @@ object Repository {
             warehouseState = prefs.getInt(KEY_WAREHOUSE_STATE, 0),
             theatreMeetingDurationHours = prefs.getInt(KEY_THEATRE_MEETING_DURATION, 3),
             warehouseMeetingDurationHours = prefs.getInt(KEY_WAREHOUSE_MEETING_DURATION, 3),
-            meetingActivatedTimestamp = prefs.getLong(KEY_MEETING_ACTIVATED_TIMESTAMP, 0L)
+            meetingActivatedTimestamp = prefs.getLong(KEY_MEETING_ACTIVATED_TIMESTAMP, 0L),
+            meetingModeEnabled = if (prefs.contains("meetingModeDefaultv2")) prefs.getBoolean(KEY_MEETING_MODE, true) else {
+                prefs.edit().putBoolean("meetingModeDefaultv2", true).putBoolean(KEY_MEETING_MODE, true).apply()
+                true
+            },
+            batteryMonitoringEnabled = prefs.getBoolean(KEY_BATTERY_MONITORING_ENABLED, true),
+            batteryEmailAddressOverride = prefs.getString(KEY_BATTERY_EMAIL_OVERRIDE, "") ?: "",
+            batteryAdminLogLevel = prefs.getInt(KEY_BATTERY_ADMIN_LOG_LEVEL, 30),
+            batteryEmailLevel = prefs.getInt(KEY_BATTERY_EMAIL_LEVEL, 12),
+            smtpHost = prefs.getString(KEY_SMTP_HOST, "") ?: "",
+            smtpPort = prefs.getInt(KEY_SMTP_PORT, 465),
+            smtpUser = prefs.getString(KEY_SMTP_USER, "") ?: "",
+            smtpPass = prefs.getString(KEY_SMTP_PASS, "") ?: ""
         )
         settings = loaded
         // Persist migrated value if we used the legacy key
@@ -1421,6 +1441,14 @@ object Repository {
             .putInt(KEY_THEATRE_MEETING_DURATION, settings.theatreMeetingDurationHours)
             .putInt(KEY_WAREHOUSE_MEETING_DURATION, settings.warehouseMeetingDurationHours)
             .putLong(KEY_MEETING_ACTIVATED_TIMESTAMP, settings.meetingActivatedTimestamp)
+            .putBoolean(KEY_BATTERY_MONITORING_ENABLED, settings.batteryMonitoringEnabled)
+            .putString(KEY_BATTERY_EMAIL_OVERRIDE, settings.batteryEmailAddressOverride)
+            .putInt(KEY_BATTERY_ADMIN_LOG_LEVEL, settings.batteryAdminLogLevel)
+            .putInt(KEY_BATTERY_EMAIL_LEVEL, settings.batteryEmailLevel)
+            .putString(KEY_SMTP_HOST, settings.smtpHost)
+            .putInt(KEY_SMTP_PORT, settings.smtpPort)
+            .putString(KEY_SMTP_USER, settings.smtpUser)
+            .putString(KEY_SMTP_PASS, settings.smtpPass)
             .putString(KEY_DARK_SPLIT_CHAR, settings.darkPanelSplitChar.toString())
             .also { editor ->
                 val lastMod = settings.regularListLastModifiedMillis
@@ -2731,38 +2759,75 @@ object Repository {
                     // 3. Questions Worksheet
                     findSheetByKeywords(wb, listOf("question"), 2)?.let { qSheet ->
                         val qLines = mutableListOf<String>()
-                        val maxRow = maxOf(qSheet.lastRowNum, 17)
-                        for (i in 0..maxRow) { // Row 0 = B1, Rows 1..13 = B2..B14, Rows 14..15 = B15..B16, Row 16 = B17, Row 17 = B18
+                        val maxRow = maxOf(qSheet.lastRowNum, 15)
+                        for (i in 0..maxRow) { // Row 0 = B1, Rows 1..13 = B2..B14, Rows 14..15 = B15..B16
                             val v = getCellValueAsString(qSheet.getRow(i)?.getCell(1))
                             qLines.add(v)
-                        }
-                        val b17Val = qLines.getOrNull(16)?.toIntOrNull()?.coerceIn(1, 24)
-                        val b18Val = qLines.getOrNull(17)?.toIntOrNull()?.coerceIn(1, 24)
-                        if (b17Val != null || b18Val != null) {
-                            updateSettings { it.copy(
-                                theatreMeetingDurationHours = b17Val ?: it.theatreMeetingDurationHours,
-                                warehouseMeetingDurationHours = b18Val ?: it.warehouseMeetingDurationHours
-                            ) }
                         }
                         if (qLines.any { it.isNotBlank() }) loadQuestionLines(qLines)
                     }
 
-                    // 4. Titles Worksheet
-                    findSheetByKeywords(wb, listOf("title"), 3)?.let { titleSheet ->
+                    // 4. Headings Worksheet (formerly Titles)
+                    findSheetByKeywords(wb, listOf("heading", "title"), 3)?.let { headSheet ->
+                        val b2 = getCellValueAsString(headSheet.getRow(1)?.getCell(1)) // Default Title
+                        val b3 = getCellValueAsString(headSheet.getRow(2)?.getCell(1)) // Righthand Column
+                        val b4 = getCellValueAsString(headSheet.getRow(3)?.getCell(1)) // Lefthand Column
+                        val b5 = getCellValueAsString(headSheet.getRow(4)?.getCell(1)) // Screen Saver message
+
+                        updateSettings { it.copy(
+                            headerText = if (b2.isNotBlank()) b2 else it.headerText,
+                            rightHeading = if (b3.isNotBlank()) b3 else it.rightHeading,
+                            leftHeading = if (b4.isNotBlank()) b4 else it.leftHeading,
+                            screenSaverMessage = if (b5.isNotBlank()) b5 else it.screenSaverMessage
+                        ) }
+
                         val titlesList = mutableListOf<String>()
-                        val last = titleSheet.lastRowNum
+                        val last = headSheet.lastRowNum
                         for (i in 0..last) {
-                            val v = getCellValueAsString(titleSheet.getRow(i)?.getCell(1)).ifBlank {
-                                getCellValueAsString(titleSheet.getRow(i)?.getCell(0))
+                            val v = getCellValueAsString(headSheet.getRow(i)?.getCell(1)).ifBlank {
+                                getCellValueAsString(headSheet.getRow(i)?.getCell(0))
                             }
                             titlesList.add(v)
                         }
                         if (titlesList.isNotEmpty()) loadTitles(titlesList)
                     }
+
+                    // 5. Battery Worksheet
+                    findSheetByKeywords(wb, listOf("battery"), 4)?.let { batterySheet ->
+                        val adminLogLevel = getCellValueAsString(batterySheet.getRow(1)?.getCell(1)).toIntOrNull() // Cell B2
+                        val emailLevel = getCellValueAsString(batterySheet.getRow(2)?.getCell(1)).toIntOrNull() // Cell B3
+                        val emailAddr = getCellValueAsString(batterySheet.getRow(3)?.getCell(1)) // Cell B4
+                        val smtpHostVal = getCellValueAsString(batterySheet.getRow(4)?.getCell(1)) // Cell B5
+                        val smtpPortVal = getCellValueAsString(batterySheet.getRow(5)?.getCell(1)).toIntOrNull() // Cell B6
+                        val smtpUserVal = getCellValueAsString(batterySheet.getRow(6)?.getCell(1)) // Cell B7
+                        val smtpPassVal = getCellValueAsString(batterySheet.getRow(7)?.getCell(1)) // Cell B8
+
+                        updateSettings { it.copy(
+                            batteryAdminLogLevel = adminLogLevel ?: it.batteryAdminLogLevel,
+                            batteryEmailLevel = emailLevel ?: it.batteryEmailLevel,
+                            batteryEmailAddressOverride = if (emailAddr.isNotBlank()) emailAddr else it.batteryEmailAddressOverride,
+                            smtpHost = if (smtpHostVal.isNotBlank()) smtpHostVal else it.smtpHost,
+                            smtpPort = smtpPortVal ?: it.smtpPort,
+                            smtpUser = if (smtpUserVal.isNotBlank()) smtpUserVal else it.smtpUser,
+                            smtpPass = if (smtpPassVal.isNotBlank()) smtpPassVal else it.smtpPass
+                        ) }
+                    }
+
+                    // 6. Meetings Worksheet
+                    findSheetByKeywords(wb, listOf("meeting"), 5)?.let { mSheet ->
+                        val b2Val = getCellValueAsString(mSheet.getRow(1)?.getCell(1)).toIntOrNull()?.coerceIn(1, 24) // Cell B2 (Theatre Meeting Duration)
+                        val b3Val = getCellValueAsString(mSheet.getRow(2)?.getCell(1)).toIntOrNull()?.coerceIn(1, 24) // Cell B3 (Warehouse Meeting Duration)
+                        if (b2Val != null || b3Val != null) {
+                            updateSettings { it.copy(
+                                theatreMeetingDurationHours = b2Val ?: it.theatreMeetingDurationHours,
+                                warehouseMeetingDurationHours = b3Val ?: it.warehouseMeetingDurationHours
+                            ) }
+                        }
+                    }
                 }
             }
             val fileName = settings.inAppListsDisplayName ?: settings.referenceDataDisplayName ?: getDisplayName(uriStr) ?: uriStr
-            logAdminEvent("In App Lists change detected and enacted. File: $fileName. Worksheets loaded: Locations, Roles, Questions, Titles")
+            logAdminEvent("Settings change detected and enacted. File: $fileName. Worksheets loaded: Locations, Roles, Questions, Headings, Battery, Meetings")
         } catch (e: Exception) {
             Log.e("Repository", "Error processing In App Lists workbook: ${e.message}")
         }
@@ -2770,24 +2835,14 @@ object Repository {
 
     fun processReferenceDataWorkbook(uriStr: String?) = processInAppListsWorkbook(uriStr)
 
-    /**
-     * Reads cell B17 (Row 17, Column B) from the Questions file for meeting duration hours (1-24).
-     */
-    fun readCellB17(uriStr: String?): Int? = readExcelCell(uriStr, 16, 1)
-
-    /**
-     * Reads cell B18 (Row 18, Column B) from the Questions file for warehouse meeting duration hours (1-24).
-     */
-    fun readCellB18(uriStr: String?): Int? = readExcelCell(uriStr, 17, 1)
-
-    private fun readExcelCell(uriStr: String?, rowIndex: Int, colIndex: Int): Int? {
+    private fun readMeetingCell(uriStr: String?, rowIndex: Int, colIndex: Int): Int? {
         if (uriStr.isNullOrBlank()) return null
         return try {
             val uri = Uri.parse(uriStr)
             appContext.contentResolver.openInputStream(uri)?.use { input ->
                 val workbook: Workbook = WorkbookFactory.create(input)
                 workbook.use { wb ->
-                    val sheet = wb.getSheetAt(0)
+                    val sheet = findSheetByKeywords(wb, listOf("meeting"), 5) ?: wb.getSheetAt(0)
                     val row = sheet.getRow(rowIndex)
                     val cell = row?.getCell(colIndex)
                     val str = getCellValueAsString(cell)
@@ -2795,8 +2850,92 @@ object Repository {
                 }
             }
         } catch (e: Exception) {
-            Log.e("Repository", "Error reading cell ($rowIndex, $colIndex) from questions file: ${e.message}")
+            Log.e("Repository", "Error reading meeting cell ($rowIndex, $colIndex): ${e.message}")
             null
+        }
+    }
+
+    /**
+     * Reads cell B2 (Row 1, Column B) from the Meetings worksheet for meeting duration hours (1-24).
+     */
+    fun readCellB17(uriStr: String?): Int? = readMeetingCell(uriStr, 1, 1)
+
+    /**
+     * Reads cell B3 (Row 2, Column B) from the Meetings worksheet for warehouse meeting duration hours (1-24).
+     */
+    fun readCellB18(uriStr: String?): Int? = readMeetingCell(uriStr, 2, 1)
+
+    fun sendBackgroundEmail(to: String, subject: String, body: String) {
+        val host = settings.smtpHost.trim()
+        val port = settings.smtpPort
+        val user = settings.smtpUser.trim()
+        val pass = settings.smtpPass.trim()
+        val recipient = to.trim()
+
+        repositoryScope.launch(Dispatchers.IO) {
+            if (host.isNotBlank() && user.isNotBlank() && pass.isNotBlank() && recipient.isNotBlank()) {
+                val success = sendSmtpEmail(host, port, user, pass, recipient, subject, body)
+                if (success) {
+                    logAdminEvent("Critical Battery Email sent successfully via SMTP to $recipient")
+                } else {
+                    logAdminEvent("Failed to send SMTP email to $recipient. Check SMTP server settings, port, and app password.")
+                }
+            } else {
+                logAdminEvent("SMTP not configured in 'Battery' worksheet (Cells B5-B8). Background email skipped. Host='$host', User='$user', To='$recipient'")
+            }
+        }
+    }
+
+    private fun sendSmtpEmail(
+        host: String,
+        port: Int,
+        user: String,
+        pass: String,
+        to: String,
+        subject: String,
+        body: String
+    ): Boolean {
+        return try {
+            val props = java.util.Properties().apply {
+                put("mail.smtp.host", host)
+                put("mail.smtp.port", port.toString())
+                put("mail.smtp.auth", "true")
+                put("mail.smtp.connectiontimeout", "20000")
+                put("mail.smtp.timeout", "20000")
+                put("mail.smtp.ssl.trust", "*")
+                put("mail.smtp.ssl.checkserveridentity", "false")
+                if (port == 465) {
+                    put("mail.smtp.socketFactory.port", port.toString())
+                    put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory")
+                    put("mail.smtp.socketFactory.fallback", "false")
+                    put("mail.smtp.ssl.enable", "true")
+                } else if (port == 587) {
+                    put("mail.smtp.starttls.enable", "true")
+                    put("mail.smtp.starttls.required", "true")
+                }
+            }
+
+            val session = javax.mail.Session.getInstance(props, object : javax.mail.Authenticator() {
+                override fun getPasswordAuthentication(): javax.mail.PasswordAuthentication {
+                    return javax.mail.PasswordAuthentication(user, pass)
+                }
+            })
+
+            val message = javax.mail.internet.MimeMessage(session)
+            message.setFrom(javax.mail.internet.InternetAddress(user))
+            message.setRecipients(javax.mail.Message.RecipientType.TO, javax.mail.internet.InternetAddress.parse(to))
+            message.subject = subject
+            message.setText(body)
+            message.setHeader("X-Priority", "1")
+            message.setHeader("X-MSMail-Priority", "High")
+            message.setHeader("Importance", "High")
+
+            javax.mail.Transport.send(message)
+            true
+        } catch (e: Exception) {
+            Log.e("SMTP", "JavaMail Send Error: ${e.message}", e)
+            logAdminEvent("JavaMail Exception (${e.javaClass.simpleName}): ${e.message}")
+            false
         }
     }
 }

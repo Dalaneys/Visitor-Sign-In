@@ -8,6 +8,11 @@ android {
     namespace = "stu.gpt.signing"
     compileSdk = 36
 
+    packaging {
+        resources.excludes.add("META-INF/LICENSE.md")
+        resources.excludes.add("META-INF/NOTICE.md")
+    }
+
     signingConfigs {
         create("release") {
             storeFile = file("../sign-in-release.keystore")
@@ -21,8 +26,8 @@ android {
         applicationId = "stu.gpt.signing"
         minSdk = 29
         targetSdk = 36
-        versionCode = 4
-        versionName = "4.3"
+        versionCode = 5
+        versionName = "5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -60,6 +65,9 @@ dependencies {
     implementation("org.apache.poi:poi:5.2.3")
     implementation("org.apache.poi:poi-ooxml:5.2.3")
     implementation("org.apache.xmlbeans:xmlbeans:5.0.2")
+    // JavaMail for background SMTP sending
+    implementation("com.sun.mail:android-mail:1.6.7")
+    implementation("com.sun.mail:android-activation:1.6.7")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

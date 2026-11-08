@@ -2,6 +2,7 @@ package stu.gpt.signing.ui
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -64,6 +65,96 @@ fun SignInScreen(
     onSignInSuccess: () -> Unit,
 ) {
     val settings = Repository.settings
+    val context = LocalContext.current
+    var batteryLevel by remember { mutableIntStateOf(100) }
+    var isPluggedIn by remember { mutableStateOf(false) }
+    var emailSentForLevel3 by remember { mutableStateOf(false) }
+    var adminLogSentForLevel1 by remember { mutableStateOf(false) }
+
+    DisposableEffect(context) {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+                val level = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                val scale = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                if (level >= 0 && scale > 0) {
+                    batteryLevel = ((level * 100) / scale).coerceIn(0, 100)
+                }
+                val status = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+                val charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                               status == android.os.BatteryManager.BATTERY_STATUS_FULL
+                val plugged = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
+                isPluggedIn = plugged > 0 || charging
+            }
+        }
+        val filter = android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED)
+        val intent = context.registerReceiver(receiver, filter)
+        intent?.let {
+            val level = it.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+            val scale = it.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+            if (level >= 0 && scale > 0) {
+                batteryLevel = ((level * 100) / scale).coerceIn(0, 100)
+            }
+            val status = it.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+            val charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                           status == android.os.BatteryManager.BATTERY_STATUS_FULL
+            val plugged = it.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, -1)
+            isPluggedIn = plugged > 0 || charging
+        }
+        onDispose {
+            try {
+                context.unregisterReceiver(receiver)
+            } catch (_: Exception) {}
+        }
+    }
+
+    var lastBatteryLogTime by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(batteryLevel, isPluggedIn) {
+        val adminLevel = Repository.settings.batteryAdminLogLevel
+        val emailLevel = Repository.settings.batteryEmailLevel
+
+        if (isPluggedIn) {
+            adminLogSentForLevel1 = false
+            emailSentForLevel3 = false
+        }
+
+        if (batteryLevel > adminLevel) {
+            adminLogSentForLevel1 = false
+        }
+        if (batteryLevel > emailLevel) {
+            emailSentForLevel3 = false
+        }
+
+        if (Repository.settings.batteryMonitoringEnabled && !isPluggedIn) {
+            if (batteryLevel <= adminLevel) {
+                val now = System.currentTimeMillis()
+                val oneHour = 60 * 60 * 1000L
+                if (!adminLogSentForLevel1 || (now - lastBatteryLogTime >= oneHour)) {
+                    adminLogSentForLevel1 = true
+                    lastBatteryLogTime = now
+                    val logMsg = "Hourly Battery Status: $batteryLevel% (Below Admin Level $adminLevel%)"
+                    android.util.Log.w("SignInBattery", logMsg)
+                    Repository.logAdminEvent(logMsg)
+                }
+            }
+
+            if (batteryLevel <= emailLevel && !emailSentForLevel3) {
+                emailSentForLevel3 = true
+                val emailAddress = Repository.settings.batteryEmailAddressOverride.ifBlank { Repository.questionLines.getOrNull(9) ?: "" }
+                val modeName = if (Repository.settings.warehouseModeEnabled) {
+                    Repository.questionLines.getOrNull(13) ?: "Warehouse"
+                } else {
+                    "Theatre"
+                }
+                val subject = "$modeName Sign-In Tablet Battery Critical $batteryLevel%"
+                val body = "The sign-in tablet’s battery is now $batteryLevel% and may shut down soon. Please arrange for someone to check the charger connections as soon as possible. Thankyou"
+
+                if (emailAddress.isNotBlank()) {
+                    Repository.sendBackgroundEmail(emailAddress, subject, body)
+                }
+            }
+        }
+    }
     val visitors = Repository.visitors
     val stageMembers = Repository.stageMembers
     val stageTappedAt = Repository.stageTappedAt
@@ -205,6 +296,23 @@ fun SignInScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.padding(16.dp)) {
             Spacer(Modifier.height(15.dp)) // Lowered main heading (5dp + 10dp)
+
+            val adminLevel = Repository.settings.batteryAdminLogLevel
+            val emailLevel = Repository.settings.batteryEmailLevel
+            val criticalThreshold = adminLevel - 10
+
+            val activeLevel = when {
+                !Repository.settings.batteryMonitoringEnabled || isPluggedIn -> 0
+                batteryLevel <= emailLevel -> 3
+                batteryLevel <= criticalThreshold -> 2
+                batteryLevel <= adminLevel -> 1
+                else -> 0
+            }
+
+            if (activeLevel > 0) {
+                BatteryStatusBanner(level = activeLevel, batteryLevel = batteryLevel)
+                Spacer(Modifier.height(8.dp))
+            }
             val effectiveTitle = if (isMeetingActive || Repository.stageMembers.isEmpty()) settings.headerText else Repository.playTitle
             
             Box(modifier = Modifier.fillMaxWidth()) {
@@ -1069,7 +1177,7 @@ fun VisitorRow(entry: VisitorEntry, onTap: () -> Unit) {
     }
     val textColor = Color.Black
 
-        Surface(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { 
@@ -1236,6 +1344,42 @@ fun CarRegReminderPopup() {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun BatteryStatusBanner(level: Int, batteryLevel: Int) {
+    val backgroundColor = if (level == 1) Color(0xFFE0E0E0) else Color(0xFFFED101)
+    val textColor = if (level == 1) Color.Black else Color.Red
+    val borderStroke = if (level == 1) null else BorderStroke(1.dp, Color.Red)
+    val message = if (level == 3) {
+        "Battery Level at $batteryLevel% - Check Connections, Technical Dept' Aware"
+    } else {
+        "Battery Level at $batteryLevel% - Check Connections"
+    }
+
+    Surface(
+        color = backgroundColor,
+        modifier = Modifier
+            .fillMaxWidth()
+            .let { if (borderStroke != null) it.border(borderStroke, RoundedCornerShape(8.dp)) else it },
+        shape = RoundedCornerShape(8.dp),
+        shadowElevation = 4.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp, horizontal = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = message,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
