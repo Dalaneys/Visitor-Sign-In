@@ -1,4 +1,4 @@
-# Sign-In Application v4.2 - Professional Documentation
+# Sign-In Application v5.0 - Professional Documentation
 
 ## Table of Contents
 1. Overview
@@ -11,14 +11,14 @@
 8. Data Management & File Layouts (Cast, Roles, Locations, Warehouse, Meeting)
 9. Special Input Codes
 10. Log Retention & Maintenance
-11. Troubleshooting
+11. Battery Monitoring System & Email Test
 12. Technical Specifications
 
 ---
 
 ## 1. Overview
 
-Sign-In v4.2 is a robust digital attendance system designed for professional environments like theatre companies and offices. It features real-time tracking, full offline persistence, automated data management via synced Excel files, custom theme color engine, Warehouse 3-step cycle mode, separate remote-controlled Meeting timers for Theatre (cell B17) and Warehouse (cell B18), 30-day strict retention, UK datestamped 24-hr record saves, and robust sign-in safeguards.
+Sign-In v5.0 is a robust digital attendance system designed for professional environments like theatre companies and offices. It features real-time tracking, full offline persistence, automated data management via synced Excel files, custom theme color engine, Loc'n 2 3-step cycle mode, separate remote-controlled Meeting timers for Loc'n 1 (cell B2) and Loc'n 2 (cell B3) in the Meetings worksheet, operational 24-hour day record saving (04:01 AM to 04:00 AM next day), subfolder log organization (`Records/` and `Admin Logs/`), 30-day strict retention, real-time MediaScanner cloud-sync notifications, robust sign-in safeguards, an advanced automated battery monitoring system, and an integrated SMTP **EMAIL TEST** utility with **High Priority** tagging (`X-Priority: 1`, `Importance: High`).
 
 ---
 
@@ -40,11 +40,11 @@ Sign-In v4.2 is a robust digital attendance system designed for professional env
 - **Restricted Settings Override**: On Android 11+ tablets where the permission switch appears grayed out or disabled:
   1. Tap the **three dots (`⋮`)** at the top right corner of the Android settings screen.
   2. Select **"Allow restricted settings"**.
-  3. Return to the settings page and enable the permission toggle for Sign-In v4.2.
+  3. Return to the settings page and enable the permission toggle for Sign-In v5.0.
 
 ### Tablet Auto-Restart & Battery Optimization Note
 - On certain tablets (Samsung, Lenovo, etc.), OEM background process managers may terminate apps launched automatically via boot receivers. 
-- **Action**: Go to **Settings > Apps > Sign-In v4.2 > Battery**, set it to **"Unrestricted"**, and enable **Auto-start / Allow background activity** in device settings.
+- **Action**: Go to **Settings > Apps > Sign-In v5.0 > Battery**, set it to **"Unrestricted"**, and enable **Auto-start / Allow background activity** in device settings.
 
 ---
 
@@ -53,7 +53,7 @@ Sign-In v4.2 is a robust digital attendance system designed for professional env
 - **Dual Panels**: Visitors/Members on the Left, Cast list on the Right.
 - **Instruction Block**: Simplified sign-in and sign-out guidance.
 - **Next Sync Indicator**: Discreet timestamp positioned safely below the system status bar (`padding(top = 45.dp, end = 12.dp)`), displaying **"Next Sync: [HH:mm]"** at 11.sp font size.
-- **Admin Indicators**: Clean remote-status indicators (Theatre duration loaded from cell B17 and Warehouse duration from cell B18).
+- **Admin Indicators**: Clean remote-status indicators (Theatre duration loaded from cell B2 and Warehouse duration from cell B3 in the Meetings worksheet).
 
 ---
 
@@ -77,8 +77,12 @@ Sign-In v4.2 is a robust digital attendance system designed for professional env
 ### 6.2 Modes (Loc'n 2 Enable & Meeting Mode)
 - In Admin under **Modes**, toggle **Loc'n 2 Enable** or **Meeting Mode** (mutually exclusive).
 - **Loc'n 2 3-Step Button Cycle**: Cycles through **🎭 #1** (0) ➔ **🎭 #2** (1) ➔ **👥 Meeting** (2, displaying meeting icon and bright blue background).
-- **Meeting Mode & Remote Durations (Cells B17 & B18)**: Loc'n 1 meeting duration (`1-24` hours) is controlled remotely by cell **B17**, and Loc'n 2 meeting duration (`1-24` hours) is controlled remotely by cell **B18** in the Questions sheet of "In App Lists". Both values are displayed as `Loc'n 1:` and `Loc'n 2:` indicators on the Admin screen (`Duration: Questions B17 & B18`). Meeting mode automatically deactivates after the respective configured hours have elapsed since activation.
+- **Meeting Mode & Remote Durations (Meetings Worksheet Cells B2 & B3)**: Loc'n 1 meeting duration (`1-24` hours) is controlled remotely by cell **B2**, and Loc'n 2 meeting duration (`1-24` hours) is controlled remotely by cell **B3** in the **Meetings** worksheet of the Settings workbook. Both values are displayed as `Loc'n 1:` and `Loc'n 2:` indicators on the Admin screen (`Duration: Meetings B2 & B3`). Meeting mode automatically deactivates after the respective configured hours have elapsed since activation.
 - **"Signed in Cast Member is King"**: If any cast member is checked in (`stageActive`), the Meeting button is automatically disabled in both modes.
+
+### 6.3 Email Test Utility in Admin
+- Located in the bottom action bar of the Admin screen (yellow **EMAIL TEST** button).
+- Tapping this button reads the target email address from the **Battery** worksheet (Cell B4) of the uploaded **Settings** workbook and triggers an immediate background SMTP test email (`"Sign-In App Test Email"`) tagged with **High Priority** (`X-Priority: 1`, `Importance: High`) to verify SMTP credentials and server connectivity.
 
 ---
 
@@ -92,7 +96,7 @@ Sign-In v4.2 is a robust digital attendance system designed for professional env
 
 ## 8. Data Management & File Layouts
 
-All files must be in Excel (`.xlsx`) format. In Admin, files are uploaded via 3 large, equal-width buttons: **"Cast"**, **"Members"**, and **"In App Lists"**.
+All files must be in Excel (`.xlsx`) format. In Admin, files are uploaded via 3 large, equal-width buttons: **"Cast"**, **"Members"**, and **"Settings"**.
 
 ### Cast File (RH Side)
 - **Worksheet Names**: `Location #1` (Loc'n 1 / Theatre), `Location #2 - A` (Loc'n 2 Play A / Rehearsals), `Location #2 - B` (Loc'n 2 Play B / Youth).
@@ -105,7 +109,7 @@ All files must be in Excel (`.xlsx`) format. In Admin, files are uploaded via 3 
 - **Column B**: Last Name.
 *(The app automatically sorts members alphabetically and computes the dynamic midpoint split letter for Dark mode panels).*
 
-### In App Lists File (Single Combined Workbook with 4 Worksheets)
+### Settings File (Single Combined Workbook with Worksheets)
 - **Locations Worksheet**:
   - **Cell A1**: Inputbox Label.
   - **Cells A2:A20**: Theatre Locations.
@@ -117,15 +121,24 @@ All files must be in Excel (`.xlsx`) format. In Admin, files are uploaded via 3 
 - **Questions Worksheet** *(No header row)*:
   - **Cells B1–B14**: Last Person Sign-Out Checklist Text (up to 14 checklist questions).
   - **Cells B15–B16**: Reminder Pop-Up Message (Line 1 = B15, Line 2 = B16).
-  - **Cell B17**: Theatre Meeting Duration hours (`1–24`).
-  - **Cell B18**: Warehouse Meeting Duration hours (`1–24`).
+- **Meetings Worksheet**:
+  - **Cell B2**: Theatre Meeting Duration hours (`1–24`).
+  - **Cell B3**: Warehouse Meeting Duration hours (`1–24`).
 - **Titles Worksheet**:
   - **Cell B2**: Default Play Title / Main Screen Header.
   - **Cell B3**: Left Panel Heading.
   - **Cell B4**: Right Panel Heading.
   - **Cell B5**: Screen Saver Message.
+- **Battery Worksheet**:
+  - **Cell B2**: Admin Log Level (`batteryAdminLogLevel`, default `30`%).
+  - **Cell B3**: Email Sending Level (`batteryEmailLevel`, default `12`%).
+  - **Cell B4**: Email Address Override (`batteryEmailAddressOverride`).
+  - **Cell B5**: SMTP Host (`smtpHost`).
+  - **Cell B6**: SMTP Port (`smtpPort`).
+  - **Cell B7**: SMTP Username (`smtpUser`).
+  - **Cell B8**: SMTP Password (`smtpPass`).
 
-*When "In App Lists" is updated, change detection reloads all 4 worksheets simultaneously and logs an Admin Event reporting the worksheet change.*
+*When "Settings" is updated, change detection reloads all worksheets simultaneously and logs an Admin Event reporting the worksheet changes.*
 
 ---
 
@@ -147,10 +160,51 @@ Entered into the **Name** input box:
 
 ---
 
-## 11. Technical Specifications
+## 11. Battery Monitoring System & Email Test
+
+Sign-In v5.0 features an advanced, real-time battery monitoring system engineered specifically for continuous-operation sign-in tablets. It continuously tracks battery percentage and charging state via Android's `BroadcastReceiver` (`Intent.ACTION_BATTERY_CHANGED`), supports dynamic configuration via the **'Battery' worksheet in the Settings Excel workbook**, logs administrative warnings, displays prominent color-coded UI warning banners, and automatically dispatches critical SMTP warning emails with **High Priority** headers (`X-Priority: 1`, `Importance: High`) when power levels drop below safe operating thresholds.
+
+### 11.1 Configuration & Admin Control
+- **Admin Settings Toggle**: In the Admin area under the **Battery Monitoring** section, battery monitoring can be enabled or disabled instantly via a toggle switch (`batteryMonitoringEnabled`).
+- **Settings Excel Workbook ('Battery' Worksheet Integration)**: When uploading or updating the **Settings** Excel workbook, the app automatically processes the **'Battery' worksheet** (or any worksheet matching the keyword "battery") to configure thresholds and SMTP parameters:
+  - **Cell B2**: Admin Log Level (`batteryAdminLogLevel`, default `30`%).
+  - **Cell B3**: Email Sending Level (`batteryEmailLevel`, default `12`%).
+  - **Cell B4**: Email Address Override (`batteryEmailAddressOverride`).
+  - **Cell B5**: SMTP Host (`smtpHost`).
+  - **Cell B6**: SMTP Port (`smtpPort`, e.g., 587 or 465).
+  - **Cell B7**: SMTP Username (`smtpUser`).
+  - **Cell B8**: SMTP Password (`smtpPass`).
+
+### 11.2 Alert Levels & Operational Logic
+When battery monitoring is enabled and the tablet is running on battery (`!isPluggedIn`), the app evaluates the battery level against three distinct severity tiers:
+
+1. **Level 1 (Admin Log Warning / Battery ≤ Admin Level, e.g., 30%)**:
+   - When the battery drops to or below `batteryAdminLogLevel`, the app logs a warning message to Logcat (`SignInBattery`) and records an administrative event log (`Repository.logAdminEvent`) noting the hourly status.
+   - **Throttling**: Log entries are throttled to at least 1-hour intervals (`lastBatteryLogTime`) to prevent log flooding.
+
+2. **Level 2 (Critical Threshold / Battery ≤ Admin Level - 10, e.g., 20%)**:
+   - Displays a light yellow warning banner (`BatteryStatusBanner`, `Color(0xFFFFF9C4)`) reading `"Battery Level at [X]% - Check Connections"`.
+
+3. **Level 3 (Critical Email Level / Battery ≤ Email Level, e.g., 12%)**:
+   - Displays a bright yellow banner with red border and bold red text (`Color(0xFFFED101)`) reading `"Battery Level at [X]% - Check Connections, Tech Contacted"` and automatically dispatches a high-priority critical SMTP email warning (`Repository.sendBackgroundEmail`, `X-Priority: 1`, `Importance: High`) to the designated recipient.
+
+### 11.3 Email Test Button in Admin
+- The Admin screen includes a dedicated yellow **EMAIL TEST** button in the bottom action bar.
+- Tapping this button reads the target recipient from Cell B4 of the **Battery** worksheet in the uploaded **Settings** workbook and sends an immediate high-priority test email (`"Sign-In App Test Email"`, `X-Priority: 1`, `Importance: High`) to verify SMTP host, port, authentication credentials, and network connectivity.
+
+### 11.4 Power Restoration & Charging Behavior
+- When the tablet is plugged into external power (`isPluggedIn == true`), all active battery warning banners are hidden, and the internal warning triggers (`adminLogSentForLevel1`, `emailSentForLevel3`) are automatically reset so future discharge cycles will trigger notifications correctly.
+
+### 11.5 OEM Battery Optimization Note
+- On certain hardware tablets (Samsung, Lenovo, etc.), OEM background process managers may aggressively terminate background tasks or prevent boot receivers from launching.
+- **Mandatory Configuration**: Go to **Settings > Apps > Sign-In v5.0 > Battery**, set the battery optimization mode to **"Unrestricted"**, and enable **Auto-start / Allow background activity** in device care settings.
+
+---
+
+## 12. Technical Specifications
 - **Framework**: Kotlin / Jetpack Compose.
-- **Versioning**: v4.2 - October 2026 Release.
+- **Versioning**: v5.0 - November 2026 Release.
 - **Storage**: Full JSON local persistence for all databases.
 - **Excel Library**: Apache POI.
 - **Background Work**: Android WorkManager for 4-hour refreshes/saves and daily maintenance at 04:00 AM.
-- **Admin Footer Branding**: Created by Stu Sorrell, v4.2.2026.10
+- **Admin Footer Branding**: Created by Stu Sorrell, v5.0.2026.11

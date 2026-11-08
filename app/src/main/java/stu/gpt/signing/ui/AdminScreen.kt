@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -65,7 +66,6 @@ fun AdminScreen(
     onExportHistory: () -> Unit,
 ) {
     val settings = Repository.settings
-    var showPinChange by remember { mutableStateOf(false) }
     var selectedColorHex by remember { mutableStateOf(settings.selectedColorHex) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -131,7 +131,7 @@ fun AdminScreen(
                         referenceDataFirst1000Hash = Repository.computeFirstNHash(uri.toString(), 1000)
                     ) }
                     try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Throwable) { }
-                    showLargeToast(context, "In App Lists uploaded successfully", 18f)
+                    showLargeToast(context, "Settings uploaded successfully", 18f)
                 } else {
                     val lines = when (pendingPick) {
                         DataKind.Names -> Repository.readExcelNames(uri.toString())
@@ -292,8 +292,72 @@ fun AdminScreen(
                 // Row 1: Security & Warehouse Mode
                 Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AdminTile(title = "Security", modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        Button(onClick = { showPinChange = true }, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 8.dp)) {
-                            Text("Change PIN", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        var pinInput by remember { mutableStateOf("") }
+                        var confirmPinInput by remember { mutableStateOf("") }
+                        Text("Change Password / PIN", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Spacer(Modifier.height(4.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedTextField(
+                                    value = pinInput,
+                                    onValueChange = { input -> pinInput = input.filter { it.isDigit() }.take(4) },
+                                    placeholder = { Text("New PIN") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f).height(50.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                                )
+                                OutlinedTextField(
+                                    value = confirmPinInput,
+                                    onValueChange = { input -> confirmPinInput = input.filter { it.isDigit() }.take(4) },
+                                    placeholder = { Text("Confirm PIN") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f).height(50.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    if (pinInput.length == 4 && pinInput == confirmPinInput) {
+                                        Repository.updateSettings { s -> s.copy(pin = pinInput) }
+                                        pinInput = ""
+                                        confirmPinInput = ""
+                                        showLargeToast(context, "Password Changed")
+                                    }
+                                },
+                                enabled = pinInput.length == 4 && pinInput == confirmPinInput,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(vertical = 8.dp)
+                            ) {
+                                Text("SAVE", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Text("Battery Monitoring", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                            Switch(
+                                checked = Repository.settings.batteryMonitoringEnabled,
+                                onCheckedChange = { enabled ->
+                                    Repository.updateSettings { s -> s.copy(batteryMonitoringEnabled = enabled) }
+                                },
+                                modifier = Modifier.scale(0.9f)
+                            )
                         }
                     }
                     AdminTile(title = "Modes", modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -516,7 +580,7 @@ fun AdminScreen(
                             filePicker.launch(mimeTypes())
                         }
                         DataButton(
-                            label = "In App Lists",
+                            label = "Settings",
                             modifier = Modifier.weight(1f).height(56.dp),
                             backgroundColor = if (refDataUploaded) Color(0xFFBEE9AD) else Color(0xFFD9D9D9)
                         ) {
@@ -556,7 +620,27 @@ fun AdminScreen(
                         Text("REFRESH", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) 
                     }
 
-                    Button(onClick = { createCsvLauncher.launch("Sign-In_History.xlsx") }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC107)), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(vertical = 8.dp)) { Text("EXPORT", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+                    Button(
+                        onClick = {
+                            val emailAddr = Repository.settings.batteryEmailAddressOverride.ifBlank { Repository.questionLines.getOrNull(9) ?: "" }
+                            if (emailAddr.isBlank()) {
+                                showLargeToast(context, "No email address set in Battery worksheet (Cell B2)")
+                            } else {
+                                Repository.sendBackgroundEmail(
+                                    emailAddr,
+                                    "Sign-In App Test Email",
+                                    "This is a test email sent from the Sign-In app to verify SMTP configuration."
+                                )
+                                showLargeToast(context, "Test email sent in background")
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC107)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        Text("EMAIL TEST", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
                     
                     Button(onClick = onExitApp, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(vertical = 8.dp)) { Text("EXIT", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
                 }
@@ -612,7 +696,7 @@ fun AdminScreen(
             }
 
             Text(
-                text = "Created by Stu Sorrell, v4.3.2026.10",
+                text = "Created by Stu Sorrell, v5.0.2026.11",
                 fontSize = 16.sp,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                 color = Color.Gray,
@@ -622,52 +706,7 @@ fun AdminScreen(
         }
     }
 
-    if (showPinChange) {
-        var newPin by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showPinChange = false },
-            title = { Text("Set New Admin PIN", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text("Enter a new 4-digit PIN to access this Admin area via the Name box.", fontSize = 16.sp)
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = newPin,
-                        onValueChange = { input ->
-                            newPin = input.filter { it.isDigit() }.take(4)
-                        },
-                        placeholder = { Text("4-digit PIN") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF3366CC),
-                            unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f),
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White
-                        ),
-                        textStyle = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newPin.length == 4) {
-                            Repository.updateSettings { s -> s.copy(pin = newPin) }
-                            showPinChange = false
-                            showLargeToast(context, "PIN Changed")
-                        }
-                    },
-                    enabled = newPin.length == 4
-                ) { Text("SET", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                Button(onClick = { showPinChange = false }) { Text("CANCEL", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
-            }
-        )
-    }
+
 
     if (showColorPickerDialog) {
         val initialColor = try {

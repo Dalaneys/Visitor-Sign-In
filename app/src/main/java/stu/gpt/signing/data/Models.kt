@@ -132,11 +132,20 @@ data class AppSettings(
     val warehouseModeEnabled: Boolean = false,
     val warehouseState: Int = 0, // 0 = GPT, 1 = YT, 2 = Meeting
     // Meeting Mode settings
-    val meetingModeEnabled: Boolean = false,
+    val meetingModeEnabled: Boolean = true,
     val meetingButtonActive: Boolean = false,
     val theatreMeetingDurationHours: Int = 3,
     val warehouseMeetingDurationHours: Int = 3,
     val meetingActivatedTimestamp: Long = 0L,
+    // Battery Monitoring settings
+    val batteryMonitoringEnabled: Boolean = true,
+    val batteryEmailAddressOverride: String = "",
+    val batteryAdminLogLevel: Int = 30,
+    val batteryEmailLevel: Int = 12,
+    val smtpHost: String = "",
+    val smtpPort: Int = 465,
+    val smtpUser: String = "",
+    val smtpPass: String = "",
     // Dynamic split character for Dark mode panels (computed from members list upload)
     val darkPanelSplitChar: Char = 'L',
 ) {

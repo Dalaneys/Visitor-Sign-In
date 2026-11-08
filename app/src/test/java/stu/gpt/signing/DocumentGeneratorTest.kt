@@ -14,17 +14,17 @@ class DocumentGeneratorTest {
 
     @Test
     fun generateDocx() {
-        val docxFile = File("Sign-In_v4.3_User_Guide.docx")
+        val docxFile = File("Sign-In_v5.0_User_Guide.docx")
         XWPFDocument().use { doc ->
             val p1 = doc.createParagraph()
             val r1 = p1.createRun()
-            r1.setText("Sign-In v4.3 – Professional User & Technical Guide")
+            r1.setText("Sign-In v5.0 – Professional User & Technical Guide")
             r1.isBold = true
             r1.fontSize = 20
             r1.color = "1F4E78"
 
             val pIntro = doc.createParagraph()
-            pIntro.createRun().setText("This comprehensive guide covers installation, configuration, themes, data management, tablet auto-start troubleshooting, and sign-in safeguards for Sign-In v4.3.")
+            pIntro.createRun().setText("This comprehensive guide covers installation, configuration, themes, data management, tablet auto-start troubleshooting, and sign-in safeguards for Sign-In v5.0.")
 
             addSection(doc, "1. Main Screen & Sign-In Safeguards", listOf(
                 "Name entry with predictive dropdown from the Members database.",
@@ -46,8 +46,16 @@ class DocumentGeneratorTest {
 
             addSection(doc, "4. Data Management & Warehouse Mode", listOf(
                 "Excel (.xlsx) integration stored in Documents/Sign-In Data/.",
-                "Members (Cols A & B), Cast (Row 1 Title, Row 2 Date, Row 3+ Names), Roles, Locations, Titles, and Questions.",
-                "Warehouse mode switchable in Admin for dedicated Warehouse worksheets (GPT/YT toggle)."
+                "Members (Cols A & B), Cast (Row 1 Title, Row 2 Date, Row 3+ Names), Roles, Locations, Titles, Questions, Meetings, and Battery.",
+                "Warehouse mode switchable in Admin for dedicated Warehouse worksheets."
+            ))
+
+            addSection(doc, "5. Battery Monitoring System & Meetings", listOf(
+                "Real-time monitoring via Android BroadcastReceiver (Intent.ACTION_BATTERY_CHANGED) tracking battery percentage and charging state.",
+                "Configurable via Excel 'Battery' worksheet in Settings workbook (Cell B2: Admin level e.g. 30%, Cell B3: Email level e.g. 12%, Cell B4: Email override, Cells B5-B8: SMTP configuration).",
+                "Meetings worksheet configures Theatre Meeting Duration (Cell B2) and Warehouse Meeting Duration (Cell B3).",
+                "Three severity tiers with High Priority email tagging (Level 1: Admin log warning, Level 2: Light yellow banner, Level 3: Bright yellow critical banner with red border and automatic High Priority SMTP alert email).",
+                "Automatic reset and banner hiding when plugged into external power."
             ))
 
             FileOutputStream(docxFile).use { out ->
