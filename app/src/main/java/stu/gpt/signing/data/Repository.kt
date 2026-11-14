@@ -1713,19 +1713,22 @@ object Repository {
         return null
     }
 
-    /** Compute SHA-256 over the first [kbytes] KB of a content Uri. Binary-safe for Excel files. */
+    /** Compute SHA-256 over the entire content of a content Uri. Binary-safe for Excel files. */
     fun computeFirstNHash(uriString: String?, kbytes: Int = 100): String? {
         if (!::appContext.isInitialized) return null
         if (uriString.isNullOrBlank()) return null
         return runCatching {
             val uri = android.net.Uri.parse(uriString)
             appContext.contentResolver.openInputStream(uri)?.use { input ->
-                val buffer = ByteArray(kbytes * 1024)
-                val bytesRead = input.read(buffer)
-                if (bytesRead <= 0) return@runCatching null
-                
                 val md = MessageDigest.getInstance("SHA-256")
-                md.update(buffer, 0, bytesRead)
+                val buffer = ByteArray(8192)
+                var bytesRead = input.read(buffer)
+                while (bytesRead != -1) {
+                    if (bytesRead > 0) {
+                        md.update(buffer, 0, bytesRead)
+                    }
+                    bytesRead = input.read(buffer)
+                }
                 val digest = md.digest()
                 digest.joinToString("") { b -> "%02x".format(b) }
             }
