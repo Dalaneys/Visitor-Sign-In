@@ -598,6 +598,9 @@ fun SignInScreen(
                                 val activationTime = if (newActive) System.currentTimeMillis() else 0L
                                 Repository.updateSettings { it.copy(meetingButtonActive = newActive, meetingActivatedTimestamp = activationTime) }
                                 Repository.logAdminEvent("Meeting mode toggled: ${if (newActive) "ON" else "OFF"}")
+                                repositoryScope.launch {
+                                    Repository.refreshAllFromPersistedUris()
+                                }
                             },
                             enabled = !isCastSignedIn,
                             modifier = Modifier

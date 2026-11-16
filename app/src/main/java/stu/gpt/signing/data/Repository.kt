@@ -1960,6 +1960,7 @@ object Repository {
                     val shouldReload = idChanged || lastModChanged || hashChanged || sizeChanged
                     if (shouldReload) {
                         Log.d("SignIn", "Names Database Change Detected. Reloading.")
+                        logAdminEvent("Names database change detected and enacted. File: ${settings.namesDisplayName ?: uriStr}")
                         val lines = readExcelNames(uriStr, namesSheets)
                         if (lines.isNotEmpty()) {
                             loadNames(lines)
@@ -1995,6 +1996,7 @@ object Repository {
                     val shouldReload = idChanged || lastModChanged || hashChanged || sizeChanged
                     if (shouldReload) {
                         Log.d("SignIn", "Roles Database Change Detected. Reloading.")
+                        logAdminEvent("Roles database change detected and enacted. File: ${settings.rolesDisplayName ?: uriStr}")
                         val lines = readExcelColumn(uriStr, 0, rolesSheets)
                         if (lines.isNotEmpty()) {
                             val header = lines.firstOrNull()?.take(30) ?: ""
@@ -2033,6 +2035,7 @@ object Repository {
                     val shouldReload = idChanged || lastModChanged || hashChanged || sizeChanged
                     if (shouldReload) {
                         Log.d("SignIn", "Locations Database Change Detected. Reloading.")
+                        logAdminEvent("Locations database change detected and enacted. File: ${settings.locationsDisplayName ?: uriStr}")
                         val lines = readExcelColumn(uriStr, 0, locsSheets)
                         if (lines.isNotEmpty()) {
                             val header = lines.firstOrNull()?.take(30) ?: ""
@@ -2071,6 +2074,7 @@ object Repository {
                             val sizeChanged = currentSize != null && currentSize != settings.regularListSize
                             
                             if (idChanged || lastModChanged || hashChanged || sizeChanged) {
+                                logAdminEvent("Cast list database change detected and enacted. File: ${settings.regularListDisplayName ?: uriStr}")
                                 processRegularListLines(lines)
                                 updateSettings { it.copy(
                                     regularListMediaStoreId = currentId,
