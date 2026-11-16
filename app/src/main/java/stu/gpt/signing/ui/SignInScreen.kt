@@ -714,12 +714,16 @@ fun SignInScreen(
             // Row 4: Lists
             // Always use a single horizontal container row for both Left & Right Panels
             // But when in Dark Mode (No Cast), we eliminate the 16.dp panel spacing gap (0.dp) to blend them together visually
+            val compactEnabled = settings.compactCastViewEnabled && stageMembers.isNotEmpty() && !isDarkMode
+            val leftWeight = if (compactEnabled) 0.38f else 1f
+            val rightWeight = if (compactEnabled) 0.62f else 1f
+
             Row(
                 modifier = Modifier.weight(1f), 
                 horizontalArrangement = if (isDarkMode) Arrangement.Start else Arrangement.spacedBy(16.dp)
             ) {
                 // Left Panel
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(leftWeight)) {
                     val leftText = if (isDarkMode) {
                         (settings.leftHeading.ifBlank { "Members / Visitors" }) + " (A-$validMidChar)"
                     } else {
@@ -815,7 +819,7 @@ fun SignInScreen(
                 }
 
                 // Right Panel
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(rightWeight)) {
                     val rightText = if (isDarkMode) {
                         (settings.leftHeading.ifBlank { "Members / Visitors" }) + " ($nextChar-Z)"
                     } else {
@@ -1230,72 +1234,128 @@ fun MembersList(
 ) {
     val stageActive = Repository.stageActive
     val stageVehicleReg = Repository.stageVehicleReg
-    val scrollState = rememberLazyListState()
+    val compact = Repository.settings.compactCastViewEnabled
 
-    LazyColumn(
-        state = scrollState,
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(members) { name ->
-            val isActive = stageActive.containsKey(name)
-            val backgroundColor = if (isActive) Color(0xFFBEE9AD) else Color(0xFFFD958D)
-            val borderColor = (if (isActive) Color(0xFF388E3C) else Color(0xFFE57373)).copy(alpha = 0.3f)
-            val textColor = Color.Black
-
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { 
-                        Repository.updateActivityTime()
-                        onTap(name, isActive) 
-                    },
-                color = backgroundColor,
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, borderColor)
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+    if (compact && members.size > 12) {
+        val mid = (members.size + 1) / 2
+        val col1 = members.take(mid)
+        val col2 = members.drop(mid)
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = name,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = textColor,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (isActive) {
-                        Column(horizontalAlignment = Alignment.End) {
-                            val time = Instant.ofEpochMilli(stageActive[name]!!)
-                                .atZone(ZoneId.systemDefault())
-                                .format(DateTimeFormatter.ofPattern("HH:mm"))
-                            Text(text = time, fontSize = 16.sp, color = textColor)
-                            
-                            val reg = stageVehicleReg[name]
-                            if (!reg.isNullOrBlank()) {
-                                Spacer(Modifier.height(4.dp))
-                                Surface(
-                                    color = Color(0xFFFED101),
-                                    shape = RoundedCornerShape(4.dp),
-                                    border = BorderStroke(0.5.dp, Color.Black)
-                                ) {
-                                    Text(
-                                        text = reg,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color.Black
-                                    )
-                                }
-                            }
+                    items(col1) { name ->
+                        CastTile(name, stageActive, stageVehicleReg, onTap)
+                    }
+                }
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(col2) { name ->
+                        CastTile(name, stageActive, stageVehicleReg, onTap)
+                    }
+                }
+            }
+        }
+    } else {
+        val scrollState = rememberLazyListState()
+        LazyColumn(
+            state = scrollState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(members) { name ->
+                CastTile(name, stageActive, stageVehicleReg, onTap)
+            }
+        }
+    }
+}
+
+@Composable
+fun CastTile(
+    name: String,
+    stageActive: Map<String, Long>,
+    stageVehicleReg: Map<String, String>,
+    onTap: (String, Boolean) -> Unit
+) {
+    val compact = Repository.settings.compactCastViewEnabled
+    val displayName = if (compact) formatCompactName(name) else name
+    val isActive = stageActive.containsKey(name)
+    val backgroundColor = if (isActive) Color(0xFFBEE9AD) else Color(0xFFFD958D)
+    val borderColor = (if (isActive) Color(0xFF388E3C) else Color(0xFFE57373)).copy(alpha = 0.3f)
+    val textColor = Color.Black
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { 
+                Repository.updateActivityTime()
+                onTap(name, isActive) 
+            },
+        color = backgroundColor,
+        shape = RoundedCornerShape(if (compact) 6.dp else 8.dp),
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = if (compact) 8.dp else 12.dp, vertical = if (compact) 6.dp else 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = displayName,
+                fontSize = if (compact) 14.sp else 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            if (isActive) {
+                Column(horizontalAlignment = Alignment.End) {
+                    val time = Instant.ofEpochMilli(stageActive[name]!!)
+                        .atZone(ZoneId.systemDefault())
+                        .format(DateTimeFormatter.ofPattern("HH:mm"))
+                    Text(text = time, fontSize = if (compact) 12.sp else 16.sp, color = textColor)
+                    
+                    val reg = stageVehicleReg[name]
+                    if (!reg.isNullOrBlank()) {
+                        Spacer(Modifier.height(2.dp))
+                        Surface(
+                            color = Color(0xFFFED101),
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(0.5.dp, Color.Black)
+                        ) {
+                            Text(
+                                text = reg,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                fontSize = if (compact) 10.sp else 14.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.Black
+                            )
                         }
                     }
                 }
             }
         }
     }
+}
+
+fun formatCompactName(fullName: String): String {
+    val parts = fullName.trim().split(Regex("\\s+"))
+    if (parts.size <= 1) return fullName
+    val first = parts.first()
+    val lastInitial = parts.last().firstOrNull()?.uppercaseChar() ?: ' '
+    return if (lastInitial != ' ') "$first $lastInitial." else fullName
 }
 
 @Composable

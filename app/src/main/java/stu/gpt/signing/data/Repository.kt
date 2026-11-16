@@ -164,6 +164,7 @@ object Repository {
     private const val KEY_SMTP_PORT = "smtpPort"
     private const val KEY_SMTP_USER = "smtpUser"
     private const val KEY_SMTP_PASS = "smtpPass"
+    private const val KEY_COMPACT_CAST_VIEW_ENABLED = "compactCastViewEnabled"
 
     // Settings (in-memory for now; can be persisted with DataStore later)
     var settings by mutableStateOf(AppSettings())
@@ -1383,7 +1384,8 @@ object Repository {
             smtpHost = prefs.getString(KEY_SMTP_HOST, "") ?: "",
             smtpPort = prefs.getInt(KEY_SMTP_PORT, 465),
             smtpUser = prefs.getString(KEY_SMTP_USER, "") ?: "",
-            smtpPass = prefs.getString(KEY_SMTP_PASS, "") ?: ""
+            smtpPass = prefs.getString(KEY_SMTP_PASS, "") ?: "",
+            compactCastViewEnabled = prefs.getBoolean(KEY_COMPACT_CAST_VIEW_ENABLED, true)
         )
         settings = loaded
         // Persist migrated value if we used the legacy key
@@ -1449,6 +1451,7 @@ object Repository {
             .putInt(KEY_SMTP_PORT, settings.smtpPort)
             .putString(KEY_SMTP_USER, settings.smtpUser)
             .putString(KEY_SMTP_PASS, settings.smtpPass)
+            .putBoolean(KEY_COMPACT_CAST_VIEW_ENABLED, settings.compactCastViewEnabled)
             .putString(KEY_DARK_SPLIT_CHAR, settings.darkPanelSplitChar.toString())
             .also { editor ->
                 val lastMod = settings.regularListLastModifiedMillis
