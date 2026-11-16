@@ -1314,7 +1314,7 @@ fun CastTile(
         ) {
             Text(
                 text = displayName,
-                fontSize = if (compact) 14.sp else 20.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = textColor,
                 maxLines = 1,
