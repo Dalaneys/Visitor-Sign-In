@@ -18,7 +18,7 @@
 
 ## 1. Overview
 
-Sign-In v5.0 is a robust digital attendance system designed for professional environments like theatre companies and offices. It features real-time tracking, full offline persistence, automated data management via synced Excel files, custom theme color engine, Loc'n 2 3-step cycle mode, separate remote-controlled Meeting timers for Loc'n 1 (cell B2) and Loc'n 2 (cell B3) in the Meetings worksheet, operational 24-hour day record saving (04:01 AM to 04:00 AM next day), subfolder log organization (`Records/` and `Admin Logs/`), 30-day strict retention, real-time MediaScanner cloud-sync notifications, robust sign-in safeguards, an advanced automated battery monitoring system, and an integrated SMTP **EMAIL TEST** utility with **High Priority** tagging (`X-Priority: 1`, `Importance: High`).
+Sign-In v5.0 is a robust digital attendance system designed for professional environments like theatre companies and offices. It features real-time tracking, full offline persistence, automated data management via synced Excel files, custom theme color engine, Loc'n 2 3-step cycle mode, separate remote-controlled Meeting timers for Loc'n 1 (cell B2) and Loc'n 2 (cell B3) in the Meetings worksheet, a **Compact Multi-Column Cast View** optimized for large casts (39+ members) with abbreviated names (`24.sp` font size) and auto-refresh on Meeting button press, operational 24-hour day record saving (04:01 AM to 04:00 AM next day), subfolder log organization (`Records/` and `Admin Logs/`), 30-day strict retention, real-time MediaScanner cloud-sync notifications, robust sign-in safeguards, an advanced automated battery monitoring system, and an integrated SMTP **EMAIL TEST** utility with **High Priority** tagging (`X-Priority: 1`, `Importance: High`).
 
 ---
 
@@ -51,6 +51,7 @@ Sign-In v5.0 is a robust digital attendance system designed for professional env
 ## 4. User Interface Overview
 - **Header**: Minimalist design with top corners left empty. 
 - **Dual Panels**: Visitors/Members on the Left, Cast list on the Right.
+- **Compact Multi-Column Cast View**: When enabled in Admin (ON by default), the Cast panel proportions expand (`0.62f` width) and split into **two side-by-side columns** with abbreviated names (`First LastInitial.`, e.g., `Dan S.`) in **24.sp** bold text, allowing 24–28 cast members to be visible simultaneously without scrolling.
 - **Instruction Block**: Simplified sign-in and sign-out guidance.
 - **Next Sync Indicator**: Discreet timestamp positioned safely below the system status bar (`padding(top = 45.dp, end = 12.dp)`), displaying **"Next Sync: [HH:mm]"** at 11.sp font size.
 - **Admin Indicators**: Clean remote-status indicators (Theatre duration loaded from cell B2 and Warehouse duration from cell B3 in the Meetings worksheet).
@@ -78,11 +79,15 @@ Sign-In v5.0 is a robust digital attendance system designed for professional env
 - In Admin under **Modes**, toggle **Loc'n 2 Enable** or **Meeting Mode** (mutually exclusive).
 - **Loc'n 2 3-Step Button Cycle**: Cycles through **🎭 #1** (0) ➔ **🎭 #2** (1) ➔ **👥 Meeting** (2, displaying meeting icon and bright blue background).
 - **Meeting Mode & Remote Durations (Meetings Worksheet Cells B2 & B3)**: Loc'n 1 meeting duration (`1-24` hours) is controlled remotely by cell **B2**, and Loc'n 2 meeting duration (`1-24` hours) is controlled remotely by cell **B3** in the **Meetings** worksheet of the Settings workbook. Both values are displayed as `Loc'n 1:` and `Loc'n 2:` indicators on the Admin screen (`Duration: Meetings B2 & B3`). Meeting mode automatically deactivates after the respective configured hours have elapsed since activation.
+- **Meeting Button Auto-Refresh**: Pressing the Meeting mode button on the main screen automatically triggers a full refresh of all databases (`Repository.refreshAllFromPersistedUris()`), allowing operators to refresh databases without opening the Admin menu.
 - **"Signed in Cast Member is King"**: If any cast member is checked in (`stageActive`), the Meeting button is automatically disabled in both modes.
 
 ### 6.3 Email Test Utility in Admin
 - Located in the bottom action bar of the Admin screen (yellow **EMAIL TEST** button).
 - Tapping this button reads the target email address from the **Battery** worksheet (Cell B4) of the uploaded **Settings** workbook and triggers an immediate background SMTP test email (`"Sign-In App Test Email"`) tagged with **High Priority** (`X-Priority: 1`, `Importance: High`) to verify SMTP credentials and server connectivity.
+
+### 6.4 Compact Multi-Column Cast Toggle
+- Located in the Admin area (ON by default). Toggles the two-column 24.sp abbreviated cast view for large casts.
 
 ---
 
@@ -153,7 +158,7 @@ Entered into the **Name** input box:
 ## 10. Log Retention & Maintenance
 - **Subfolder File Organization**: All external files are cleanly organized into dedicated subfolders inside your designated **Log Save Folder**:
   - **`[Log Save Folder]/Records/Records_YYYY-MM-DD.txt`**: Sign-in/out records for each operational 24-hour day (04:01 AM to 04:00 AM next day).
-  - **`[Log Save Folder]/Admin Logs/Admin_logs_YYYY-MM-DD.txt`**: Administrative event logs (PIN changes, settings saves, file updates).
+  - **`[Log Save Folder]/Admin Logs/Admin_logs_YYYY-MM-DD.txt`**: Administrative event logs (PIN changes, settings saves, file updates, and background/foreground database reloads).
 - **Log Retention**: Both attendance records and admin logs are retained for **30 days** (older text files are automatically pruned).
 - **Storage Consumption**: Extremely lightweight, consuming **less than 20 MB total**.
 - **Unselected Log Folder Behavior**: If no log save folder is selected in Admin, core sign-in, database loading/saving, and local history operate normally; external text log files and daily export files are simply skipped until a folder is designated.
