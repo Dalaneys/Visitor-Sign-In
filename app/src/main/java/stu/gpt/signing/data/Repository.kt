@@ -2449,16 +2449,10 @@ object Repository {
             .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
             .build()
 
-        val effectiveIntervalMinutes = 240L // 4 hours
-        val dailyTotalMinutes = settings.dailyJobHour * 60 + settings.dailyJobMinute
-        val currentTotalMinutes = LocalTime.now().hour * 60 + LocalTime.now().minute
-        var initialDelayMinutes = ((dailyTotalMinutes + 30 - currentTotalMinutes) % 240).toLong()
-        if (initialDelayMinutes < 0L) initialDelayMinutes += 240L
-        if (initialDelayMinutes == 0L) initialDelayMinutes = 30L
+        val intervalMinutes = settings.hourlyRefreshInterval.toLong().coerceIn(15L, 1440L)
 
-        val request = PeriodicWorkRequestBuilder<HourlyRefreshWorker>(effectiveIntervalMinutes, TimeUnit.MINUTES)
+        val request = PeriodicWorkRequestBuilder<HourlyRefreshWorker>(intervalMinutes, TimeUnit.MINUTES)
             .setConstraints(constraints)
-            .setInitialDelay(initialDelayMinutes, TimeUnit.MINUTES)
             .build()
 
         workManager.enqueueUniquePeriodicWork(
