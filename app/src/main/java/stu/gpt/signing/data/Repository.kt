@@ -747,6 +747,7 @@ object Repository {
                     out.bufferedWriter().use { it.write(content) }
                 }
                 notifyMediaScanner(recordFileUri)
+                logAdminEvent("Real-Time Disk Sync: Operational daily record updated - $fileName (${allDayRecords.size} total records)")
                 Log.d("Repository", "Operational daily record updated: $fileName (${allDayRecords.size} total records)")
             } catch (e: Exception) {
                 Log.e("Repository", "Failed to save daily record: ${e.message}", e)
