@@ -425,6 +425,7 @@ object Repository {
     }
 
     private val logLock = Any()
+    private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     fun logAdminEvent(message: String) {
         if (!::appContext.isInitialized) return
@@ -438,7 +439,7 @@ object Repository {
         val targetFileName = "Admin_logs_${now.format(fileDateFormatter)}.txt"
         val logLine = "[${now.format(logTimeFormatter)}] $message"
 
-        repositoryScope.launch(Dispatchers.IO) {
+        ioScope.launch {
             synchronized(logLock) {
                 try {
                     val treeUri = android.net.Uri.parse(uriStr)
@@ -747,7 +748,6 @@ object Repository {
                     out.bufferedWriter().use { it.write(content) }
                 }
                 notifyMediaScanner(recordFileUri)
-                logAdminEvent("Real-Time Disk Sync: Operational daily record updated - $fileName (${allDayRecords.size} total records)")
                 Log.d("Repository", "Operational daily record updated: $fileName (${allDayRecords.size} total records)")
             } catch (e: Exception) {
                 Log.e("Repository", "Failed to save daily record: ${e.message}", e)
