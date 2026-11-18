@@ -46,6 +46,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -1235,34 +1236,78 @@ fun MembersList(
     val stageActive = Repository.stageActive
     val stageVehicleReg = Repository.stageVehicleReg
     val compact = Repository.settings.compactCastViewEnabled
+    val minTileHeight = Repository.settings.compactCastTileHeight.coerceIn(40, 60).dp
 
-    if (compact && members.size > 12) {
-        val mid = (members.size + 1) / 2
-        val col1 = members.take(mid)
-        val col2 = members.drop(mid)
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(col1) { name ->
-                        CastTile(name, stageActive, stageVehicleReg, onTap)
+    if (compact && members.isNotEmpty()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val totalHeight = maxHeight
+            val mid = (members.size + 1) / 2
+            val spacing = 6.dp
+            val padding = 4.dp
+            val availableSpaceForItems = totalHeight - (padding * 2) - (spacing * (mid - 1))
+            val calculatedItemHeight = availableSpaceForItems / mid
+
+            val useScrolling = calculatedItemHeight < minTileHeight
+
+            val col1 = members.take(mid)
+            val col2 = members.drop(mid)
+
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Column 1
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    if (useScrolling) {
+                        val scrollState = rememberLazyListState()
+                        LazyColumn(
+                            state = scrollState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(col1) { name ->
+                                CastTile(name, stageActive, stageVehicleReg, minTileHeight, true, onTap)
+                            }
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            col1.forEach { name ->
+                                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                    CastTile(name, stageActive, stageVehicleReg, Dp.Unspecified, true, onTap, modifier = Modifier.fillMaxHeight())
+                                }
+                            }
+                        }
                     }
                 }
-            }
-            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(col2) { name ->
-                        CastTile(name, stageActive, stageVehicleReg, onTap)
+                // Column 2
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    if (useScrolling) {
+                        val scrollState = rememberLazyListState()
+                        LazyColumn(
+                            state = scrollState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(col2) { name ->
+                                CastTile(name, stageActive, stageVehicleReg, minTileHeight, true, onTap)
+                            }
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            col2.forEach { name ->
+                                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                    CastTile(name, stageActive, stageVehicleReg, Dp.Unspecified, true, onTap, modifier = Modifier.fillMaxHeight())
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1276,7 +1321,7 @@ fun MembersList(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(members) { name ->
-                CastTile(name, stageActive, stageVehicleReg, onTap)
+                CastTile(name, stageActive, stageVehicleReg, Dp.Unspecified, false, onTap)
             }
         }
     }
@@ -1287,11 +1332,12 @@ fun CastTile(
     name: String,
     stageActive: Map<String, Long>,
     stageVehicleReg: Map<String, String>,
-    onTap: (String, Boolean) -> Unit
+    preferredHeight: Dp,
+    compact: Boolean,
+    onTap: (String, Boolean) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val compact = Repository.settings.compactCastViewEnabled
     val tileHeightVal = Repository.settings.compactCastTileHeight.coerceIn(40, 60)
-    val tileHeight = tileHeightVal.dp
     val displayName = if (compact) formatCompactName(name) else name
     val isActive = stageActive.containsKey(name)
     val backgroundColor = if (isActive) Color(0xFFBEE9AD) else Color(0xFFFD958D)
@@ -1306,17 +1352,17 @@ fun CastTile(
     }
 
     Surface(
-        modifier = if (compact) {
-            Modifier.fillMaxWidth().height(tileHeight).clickable { 
+        modifier = modifier
+            .fillMaxWidth()
+            .let { 
+                if (preferredHeight != Dp.Unspecified) it.height(preferredHeight) 
+                else if (compact) it.height(tileHeightVal.dp)
+                else it.wrapContentHeight() 
+            }
+            .clickable { 
                 Repository.updateActivityTime()
                 onTap(name, isActive) 
-            }
-        } else {
-            Modifier.fillMaxWidth().wrapContentHeight().clickable { 
-                Repository.updateActivityTime()
-                onTap(name, isActive) 
-            }
-        },
+            },
         color = backgroundColor,
         shape = RoundedCornerShape(if (compact) 6.dp else 8.dp),
         border = BorderStroke(1.dp, borderColor)
