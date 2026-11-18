@@ -147,6 +147,7 @@ data class AppSettings(
     val smtpUser: String = "",
     val smtpPass: String = "",
     val compactCastViewEnabled: Boolean = true,
+    val compactCastTileHeight: Int = 50,
     // Dynamic split character for Dark mode panels (computed from members list upload)
     val darkPanelSplitChar: Char = 'L',
 ) {

@@ -165,6 +165,7 @@ object Repository {
     private const val KEY_SMTP_USER = "smtpUser"
     private const val KEY_SMTP_PASS = "smtpPass"
     private const val KEY_COMPACT_CAST_VIEW_ENABLED = "compactCastViewEnabled"
+    private const val KEY_COMPACT_CAST_TILE_HEIGHT = "compactCastTileHeight"
 
     // Settings (in-memory for now; can be persisted with DataStore later)
     var settings by mutableStateOf(AppSettings())
@@ -1386,7 +1387,8 @@ object Repository {
             smtpPort = prefs.getInt(KEY_SMTP_PORT, 465),
             smtpUser = prefs.getString(KEY_SMTP_USER, "") ?: "",
             smtpPass = prefs.getString(KEY_SMTP_PASS, "") ?: "",
-            compactCastViewEnabled = prefs.getBoolean(KEY_COMPACT_CAST_VIEW_ENABLED, true)
+            compactCastViewEnabled = prefs.getBoolean(KEY_COMPACT_CAST_VIEW_ENABLED, true),
+            compactCastTileHeight = prefs.getInt(KEY_COMPACT_CAST_TILE_HEIGHT, 50)
         )
         settings = loaded
         // Persist migrated value if we used the legacy key
@@ -1453,6 +1455,7 @@ object Repository {
             .putString(KEY_SMTP_USER, settings.smtpUser)
             .putString(KEY_SMTP_PASS, settings.smtpPass)
             .putBoolean(KEY_COMPACT_CAST_VIEW_ENABLED, settings.compactCastViewEnabled)
+            .putInt(KEY_COMPACT_CAST_TILE_HEIGHT, settings.compactCastTileHeight)
             .putString(KEY_DARK_SPLIT_CHAR, settings.darkPanelSplitChar.toString())
             .also { editor ->
                 val lastMod = settings.regularListLastModifiedMillis

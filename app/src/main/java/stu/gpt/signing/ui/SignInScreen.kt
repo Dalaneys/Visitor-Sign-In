@@ -1290,31 +1290,45 @@ fun CastTile(
     onTap: (String, Boolean) -> Unit
 ) {
     val compact = Repository.settings.compactCastViewEnabled
+    val tileHeightVal = Repository.settings.compactCastTileHeight.coerceIn(40, 60)
+    val tileHeight = tileHeightVal.dp
     val displayName = if (compact) formatCompactName(name) else name
     val isActive = stageActive.containsKey(name)
     val backgroundColor = if (isActive) Color(0xFFBEE9AD) else Color(0xFFFD958D)
     val borderColor = (if (isActive) Color(0xFF388E3C) else Color(0xFFE57373)).copy(alpha = 0.3f)
     val textColor = Color.Black
 
+    val fontSize = when {
+        !compact -> 24.sp
+        tileHeightVal <= 45 -> 16.sp
+        tileHeightVal <= 52 -> 19.sp
+        else -> 22.sp
+    }
+
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { 
+        modifier = if (compact) {
+            Modifier.fillMaxWidth().height(tileHeight).clickable { 
                 Repository.updateActivityTime()
                 onTap(name, isActive) 
-            },
+            }
+        } else {
+            Modifier.fillMaxWidth().wrapContentHeight().clickable { 
+                Repository.updateActivityTime()
+                onTap(name, isActive) 
+            }
+        },
         color = backgroundColor,
         shape = RoundedCornerShape(if (compact) 6.dp else 8.dp),
         border = BorderStroke(1.dp, borderColor)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = if (compact) 8.dp else 12.dp, vertical = if (compact) 6.dp else 12.dp),
+            modifier = Modifier.padding(horizontal = if (compact) 8.dp else 12.dp, vertical = if (compact) 2.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
                 text = displayName,
-                fontSize = 24.sp,
+                fontSize = fontSize,
                 fontWeight = FontWeight.Bold,
                 color = textColor,
                 maxLines = 1,
@@ -1325,14 +1339,14 @@ fun CastTile(
                     val time = Instant.ofEpochMilli(stageActive[name]!!)
                         .atZone(ZoneId.systemDefault())
                         .format(DateTimeFormatter.ofPattern("HH:mm"))
-                    Text(text = time, fontSize = if (compact) 12.sp else 16.sp, color = textColor)
+                    Text(text = time, fontSize = if (compact) (fontSize.value - 4).sp else 16.sp, color = textColor)
                     
                     val reg = stageVehicleReg[name]
                     if (!reg.isNullOrBlank()) {
-                        Spacer(Modifier.height(2.dp))
+                        Spacer(Modifier.height(1.dp))
                         Surface(
                             color = Color(0xFFFED101),
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(3.dp),
                             border = BorderStroke(0.5.dp, Color.Black)
                         ) {
                             Text(
