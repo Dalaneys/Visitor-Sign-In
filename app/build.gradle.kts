@@ -26,8 +26,8 @@ android {
         applicationId = "stu.gpt.signing"
         minSdk = 29
         targetSdk = 36
-        versionCode = 5
-        versionName = "5.0"
+        versionCode = 6
+        versionName = "5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

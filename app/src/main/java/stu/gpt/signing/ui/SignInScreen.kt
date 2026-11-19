@@ -1347,7 +1347,7 @@ fun CastTile(
     val textColor = Color.Black
 
     val fontSize = when {
-        !compact -> 24.sp
+        !compact -> 20.sp
         effectiveHeight <= 45f -> 16.sp
         effectiveHeight <= 52f -> 19.sp
         else -> 22.sp
@@ -1366,7 +1366,7 @@ fun CastTile(
                 onTap(name, isActive) 
             },
         color = backgroundColor,
-        shape = RoundedCornerShape(if (compact) 6.dp else 8.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, borderColor)
     ) {
         Row(
