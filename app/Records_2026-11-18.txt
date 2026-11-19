@@ -1,5 +1,6 @@
 Sign-In Records for 18-11-2026 (Previous 24hrs)
-Generated at: 17:32:58 (Single daily file updated in place)
+Generated at: 07:27:24 (Single daily file updated in place)
 -----------------------------------------------------------------
 Name                      Role/Loc             Date         In       Out      Reg         
-Alice Smith               Director             18-11-2026   09:32    12:32    AB12 CDE    
+Alice Smith               Director             19-11-2026   09:27    12:27    AB12 CDE    
+Bob Jones                 Cast                 18-11-2026   10:27    14:27    XY65 ZW     

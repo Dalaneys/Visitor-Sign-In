@@ -1236,7 +1236,6 @@ fun MembersList(
     val stageActive = Repository.stageActive
     val stageVehicleReg = Repository.stageVehicleReg
     val compact = Repository.settings.compactCastViewEnabled
-    val minTileHeight = Repository.settings.compactCastTileHeight.coerceIn(40, 60).dp
 
     if (compact && members.isNotEmpty()) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -1247,7 +1246,10 @@ fun MembersList(
             val availableSpaceForItems = totalHeight - (padding * 2) - (spacing * (mid - 1))
             val calculatedItemHeight = availableSpaceForItems / mid
 
-            val useScrolling = calculatedItemHeight < minTileHeight
+            // Auto-calculate tile height as ~4.8% of panel height, clamped between 40.dp and 60.dp
+            val dynamicMinTileHeight = (totalHeight * 0.048f).coerceIn(40.dp, 60.dp)
+
+            val useScrolling = calculatedItemHeight < dynamicMinTileHeight
 
             val col1 = members.take(mid)
             val col2 = members.drop(mid)
@@ -1267,7 +1269,7 @@ fun MembersList(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             items(col1) { name ->
-                                CastTile(name, stageActive, stageVehicleReg, minTileHeight, true, onTap)
+                                CastTile(name, stageActive, stageVehicleReg, dynamicMinTileHeight, true, onTap)
                             }
                         }
                     } else {
@@ -1294,7 +1296,7 @@ fun MembersList(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             items(col2) { name ->
-                                CastTile(name, stageActive, stageVehicleReg, minTileHeight, true, onTap)
+                                CastTile(name, stageActive, stageVehicleReg, dynamicMinTileHeight, true, onTap)
                             }
                         }
                     } else {
@@ -1337,7 +1339,7 @@ fun CastTile(
     onTap: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val tileHeightVal = Repository.settings.compactCastTileHeight.coerceIn(40, 60)
+    val effectiveHeight = if (preferredHeight != Dp.Unspecified) preferredHeight.value else 50f
     val displayName = if (compact) formatCompactName(name) else name
     val isActive = stageActive.containsKey(name)
     val backgroundColor = if (isActive) Color(0xFFBEE9AD) else Color(0xFFFD958D)
@@ -1346,8 +1348,8 @@ fun CastTile(
 
     val fontSize = when {
         !compact -> 24.sp
-        tileHeightVal <= 45 -> 16.sp
-        tileHeightVal <= 52 -> 19.sp
+        effectiveHeight <= 45f -> 16.sp
+        effectiveHeight <= 52f -> 19.sp
         else -> 22.sp
     }
 
@@ -1356,7 +1358,7 @@ fun CastTile(
             .fillMaxWidth()
             .let { 
                 if (preferredHeight != Dp.Unspecified) it.height(preferredHeight) 
-                else if (compact) it.height(tileHeightVal.dp)
+                else if (compact) it.height(50.dp)
                 else it.wrapContentHeight() 
             }
             .clickable { 

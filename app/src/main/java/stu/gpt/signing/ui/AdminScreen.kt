@@ -399,44 +399,17 @@ fun AdminScreen(
                 Spacer(Modifier.height(8.dp))
 
                 AdminTile(title = "Compact Multi R/H Column", modifier = Modifier.fillMaxWidth()) {
-                    var tileHeightInput by remember { mutableStateOf(Repository.settings.compactCastTileHeight.toString()) }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Text("Compact Multi R/H Column", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Compact Multi R/H Column", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                            Text("Auto-scales tile height to ~4.8% of panel height (40-60 dp)", fontSize = 11.sp, color = Color.Gray)
+                        }
                         Switch(
                             checked = Repository.settings.compactCastViewEnabled,
                             onCheckedChange = { enabled ->
                                 Repository.updateSettings { s -> s.copy(compactCastViewEnabled = enabled) }
                             },
                             modifier = Modifier.scale(0.9f)
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Tile Height (40-60 dp)", fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                            Text("Controls max tile height before scrolling starts", fontSize = 11.sp, color = Color.Gray)
-                        }
-                        OutlinedTextField(
-                            value = tileHeightInput,
-                            onValueChange = { input ->
-                                val filtered = input.filter { it.isDigit() }.take(2)
-                                tileHeightInput = filtered
-                                filtered.toIntOrNull()?.let { v ->
-                                    val clamped = v.coerceIn(40, 60)
-                                    Repository.updateSettings { s -> s.copy(compactCastTileHeight = clamped) }
-                                }
-                            },
-                            singleLine = true,
-                            modifier = Modifier.width(80.dp).height(48.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            textStyle = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White
-                            ),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                         )
                     }
                 }
