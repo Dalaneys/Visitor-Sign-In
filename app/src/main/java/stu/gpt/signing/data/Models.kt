@@ -148,6 +148,8 @@ data class AppSettings(
     val smtpPass: String = "",
     val compactCastViewEnabled: Boolean = true,
     val compactCastTileHeight: Int = 50,
+    val batteryLogRetentionDays: Int = 3,
+    val lastBatteryOffLogDate: String = "",
     // Dynamic split character for Dark mode panels (computed from members list upload)
     val darkPanelSplitChar: Char = 'L',
 ) {

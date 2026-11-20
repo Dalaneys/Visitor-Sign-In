@@ -1,0 +1,7 @@
+[2026-11-20 08:00:00] [████████████████████] 100% | Status: Plugged In / Charging
+[2026-11-20 09:00:00] [████████████████████] 100% | Status: Plugged In / Charging
+[2026-11-20 10:00:00] [████████████████    ]  80% | Status: Running on Battery
+[2026-11-20 11:00:00] [████████████        ]  60% | Status: Running on Battery
+[2026-11-20 12:00:00] [██████████          ]  50% | Status: Running on Battery
+[2026-11-20 13:00:00] [████████            ]  40% | Status: Running on Battery
+[2026-11-20 14:00:00] [████████████████████] 100% | Status: Plugged In / Charging

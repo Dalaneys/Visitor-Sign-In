@@ -21,9 +21,11 @@ class HourlyRefreshWorker(
             // Refresh all databases from persisted URIs if changed
             Repository.refreshAllFromPersistedUrisIfChanged(false)
 
-            // Save records/logs regularly and check meeting timeout
+            // Save records/logs regularly, check meeting timeout, and log battery status
             Repository.saveDailyRecordFile()
             Repository.checkAndApplyMeetingTimeout()
+            Repository.logHourlyBatteryStatus()
+            Repository.pruneBatteryLogs()
 
             Log.d("HourlyRefreshWorker", "Hourly refresh job completed successfully.")
             Result.success()

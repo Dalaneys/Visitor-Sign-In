@@ -166,6 +166,8 @@ object Repository {
     private const val KEY_SMTP_PASS = "smtpPass"
     private const val KEY_COMPACT_CAST_VIEW_ENABLED = "compactCastViewEnabled"
     private const val KEY_COMPACT_CAST_TILE_HEIGHT = "compactCastTileHeight"
+    private const val KEY_BATTERY_LOG_RETENTION_DAYS = "batteryLogRetentionDays"
+    private const val KEY_LAST_BATTERY_OFF_LOG_DATE = "lastBatteryOffLogDate"
 
     // Settings (in-memory for now; can be persisted with DataStore later)
     var settings by mutableStateOf(AppSettings())
@@ -545,6 +547,182 @@ object Repository {
             }
         }.onFailure { e ->
             Log.w("Repository", "MediaScanner notification warning: ${e.message}")
+        }
+    }
+
+    fun logHourlyBatteryStatus() {
+        if (!::appContext.isInitialized) return
+        val retentionDays = settings.batteryLogRetentionDays
+        if (retentionDays <= 0) {
+            val todayStr = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            val lastOffLogDate = settings.lastBatteryOffLogDate
+            if (lastOffLogDate != todayStr) {
+                logAdminEvent("Battery Level Monitoring off")
+                updateSettings { it.copy(lastBatteryOffLogDate = todayStr) }
+            }
+            return
+        }
+
+        val uriStr = settings.logFolderUriString ?: return
+        if (uriStr.isBlank()) return
+
+        val batteryIntent = appContext.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+        val level = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val batteryPct = if (level >= 0 && scale > 0) ((level * 100) / scale) else -1
+        val status = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+        val chargeStatusStr = if (isCharging) "Plugged In / Charging" else "Running on Battery"
+
+        val clampedPct = batteryPct.coerceIn(0, 100)
+        val filledBlocks = (clampedPct * 20) / 100
+        val emptyBlocks = 20 - filledBlocks
+        val barGraph = "█".repeat(filledBlocks) + "-".repeat(emptyBlocks)
+
+        val now = java.time.LocalDateTime.now()
+        val fileDateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
+        val logTimeFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+        
+        val targetFileName = "Battery_${now.format(fileDateFormatter)}.txt"
+        val batteryLine = "[${now.format(logTimeFormatter)}] [$barGraph] ${clampedPct}% | Status: $chargeStatusStr"
+
+        ioScope.launch {
+            synchronized(logLock) {
+                try {
+                    val treeUri = Uri.parse(uriStr)
+                    val treeId = DocumentsContract.getTreeDocumentId(treeUri)
+                    val parentDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId)
+
+                    var adminLogsFolderUri: Uri? = null
+                    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, treeId)
+                    appContext.contentResolver.query(
+                        childrenUri,
+                        arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE),
+                        null, null, null
+                    )?.use { cursor ->
+                        val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                        val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                        val mimeCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                        if (idCol >= 0 && nameCol >= 0) {
+                            while (cursor.moveToNext()) {
+                                if (cursor.getString(nameCol) == "Admin Logs" && cursor.getString(mimeCol) == DocumentsContract.Document.MIME_TYPE_DIR) {
+                                    val docId = cursor.getString(idCol)
+                                    adminLogsFolderUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                                    break
+                                }
+                            }
+                        }
+                    }
+
+                    if (adminLogsFolderUri == null) {
+                        adminLogsFolderUri = DocumentsContract.createDocument(appContext.contentResolver, parentDocUri, DocumentsContract.Document.MIME_TYPE_DIR, "Admin Logs")
+                    }
+
+                    if (adminLogsFolderUri == null) return@synchronized
+
+                    val adminLogsDocId = DocumentsContract.getDocumentId(adminLogsFolderUri!!)
+                    val adminLogsChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, adminLogsDocId)
+
+                    var fileUri: Uri? = null
+                    appContext.contentResolver.query(
+                        adminLogsChildrenUri,
+                        arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                        null, null, null
+                    )?.use { cursor ->
+                        val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                        val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                        if (idCol >= 0 && nameCol >= 0) {
+                            while (cursor.moveToNext()) {
+                                if (cursor.getString(nameCol) == targetFileName) {
+                                    val docId = cursor.getString(idCol)
+                                    fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                                    break
+                                }
+                            }
+                        }
+                    }
+
+                    if (fileUri == null) {
+                        fileUri = DocumentsContract.createDocument(appContext.contentResolver, adminLogsFolderUri!!, "text/plain", targetFileName)
+                    }
+
+                    if (fileUri != null) {
+                        val existingText = try {
+                            appContext.contentResolver.openInputStream(fileUri!!)?.use { it.bufferedReader().readText() } ?: ""
+                        } catch (_: Exception) { "" }
+
+                        val delimiter = if (existingText.isNotEmpty() && !existingText.endsWith("\n")) "\n" else ""
+                        val updatedText = existingText + delimiter + batteryLine + "\n"
+
+                        appContext.contentResolver.openOutputStream(fileUri!!, "wt")?.use { out ->
+                            out.bufferedWriter().use { it.write(updatedText) }
+                        }
+                        runCatching {
+                            val values = ContentValues().apply {
+                                put(DocumentsContract.Document.COLUMN_LAST_MODIFIED, System.currentTimeMillis())
+                            }
+                            appContext.contentResolver.update(fileUri!!, values, null, null)
+                        }
+                        notifyMediaScanner(fileUri)
+                    }
+                } catch (e: Exception) {
+                    Log.e("Repository", "Failed to write hourly battery log: ${e.message}", e)
+                }
+            }
+        }
+    }
+
+    fun pruneBatteryLogs() {
+        if (!::appContext.isInitialized) return
+        val uriStr = settings.logFolderUriString ?: return
+        if (uriStr.isBlank()) return
+        val retentionDays = settings.batteryLogRetentionDays
+        if (retentionDays <= 0) return
+
+        val cutoffDate = java.time.LocalDate.now().minusDays(retentionDays.toLong())
+
+        try {
+            val parentUri = Uri.parse(uriStr)
+            val parentId = DocumentsContract.getTreeDocumentId(parentUri)
+            
+            var adminLogsFolderId: String? = null
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, parentId)
+            appContext.contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                while (cursor.moveToNext()) {
+                    if (cursor.getString(nameCol) == "Admin Logs" && cursor.getString(mimeCol) == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        adminLogsFolderId = cursor.getString(idCol)
+                        break
+                    }
+                }
+            }
+
+            if (adminLogsFolderId == null) return
+
+            val adminLogsChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, adminLogsFolderId)
+            appContext.contentResolver.query(adminLogsChildrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                while (cursor.moveToNext()) {
+                    val displayName = cursor.getString(nameCol)
+                    if (displayName.startsWith("Battery_") && displayName.endsWith(".txt")) {
+                        val dateStr = displayName.substringAfter("Battery_").substringBefore(".txt")
+                        runCatching {
+                            val fileDate = java.time.LocalDate.parse(dateStr, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                            if (fileDate.isBefore(cutoffDate)) {
+                                val docId = cursor.getString(idCol)
+                                val fileUri = DocumentsContract.buildDocumentUriUsingTree(parentUri, docId)
+                                DocumentsContract.deleteDocument(appContext.contentResolver, fileUri)
+                                Log.d("Repository", "Pruned old battery log: $displayName")
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("Repository", "Failed to prune battery logs: ${e.message}", e)
         }
     }
 

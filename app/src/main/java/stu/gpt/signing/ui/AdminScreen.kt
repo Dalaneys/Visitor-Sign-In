@@ -346,19 +346,6 @@ fun AdminScreen(
                                 Text("SAVE", fontWeight = FontWeight.Bold)
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
-                        Spacer(Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Text("Battery Monitoring", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = Repository.settings.batteryMonitoringEnabled,
-                                onCheckedChange = { enabled ->
-                                    Repository.updateSettings { s -> s.copy(batteryMonitoringEnabled = enabled) }
-                                },
-                                modifier = Modifier.scale(0.9f)
-                            )
-                        }
                     }
                     AdminTile(title = "Modes", modifier = Modifier.weight(1f).fillMaxHeight()) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -398,10 +385,57 @@ fun AdminScreen(
 
                 Spacer(Modifier.height(8.dp))
 
-                AdminTile(title = "Compact Multi R/H Column", modifier = Modifier.fillMaxWidth()) {
+                AdminTile(title = "Battery Monitoring", modifier = Modifier.fillMaxWidth()) {
+                    var retentionInput by remember { mutableStateOf(Repository.settings.batteryLogRetentionDays.toString()) }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Text("Battery Monitoring", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                            Spacer(Modifier.width(16.dp))
+                            Switch(
+                                checked = Repository.settings.batteryMonitoringEnabled,
+                                onCheckedChange = { enabled ->
+                                    Repository.updateSettings { s -> s.copy(batteryMonitoringEnabled = enabled) }
+                                },
+                                modifier = Modifier.scale(0.9f)
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
+                            Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 8.dp)) {
+                                Text("Battery Logs to be refresh every days", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text("0-7 days (0 = Off)", fontSize = 10.sp, color = Color.Gray)
+                            }
+                            OutlinedTextField(
+                                value = retentionInput,
+                                onValueChange = { input ->
+                                    val filtered = input.filter { it.isDigit() }.take(1)
+                                    retentionInput = filtered
+                                    filtered.toIntOrNull()?.let { v ->
+                                        val clamped = v.coerceIn(0, 7)
+                                        Repository.updateSettings { s -> s.copy(batteryLogRetentionDays = clamped) }
+                                    }
+                                },
+                                singleLine = true,
+                                modifier = Modifier.width(70.dp).height(48.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                textStyle = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White
+                                ),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                AdminTile(title = "Righthand Column Display", modifier = Modifier.fillMaxWidth()) {
+                    val rightHeading = Repository.settings.rightHeading.ifBlank { "Cast" }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Compact Multi R/H Column", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                            Text("Divide Righthand Panel for long $rightHeading list", fontWeight = FontWeight.Medium, fontSize = 16.sp)
                             Text("Auto-scales tile height to ~4.8% of panel height (40-60 dp)", fontSize = 11.sp, color = Color.Gray)
                         }
                         Switch(
