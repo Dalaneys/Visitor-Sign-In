@@ -513,6 +513,12 @@ object Repository {
                         appContext.contentResolver.openOutputStream(fileUri!!, "wt")?.use { out ->
                             out.bufferedWriter().use { it.write(updatedText) }
                         }
+                        runCatching {
+                            val values = ContentValues().apply {
+                                put(DocumentsContract.Document.COLUMN_LAST_MODIFIED, System.currentTimeMillis())
+                            }
+                            appContext.contentResolver.update(fileUri!!, values, null, null)
+                        }
                         notifyMediaScanner(fileUri)
                     }
                 } catch (e: Exception) {
@@ -747,6 +753,12 @@ object Repository {
 
                 appContext.contentResolver.openOutputStream(recordFileUri, "wt")?.use { out ->
                     out.bufferedWriter().use { it.write(content) }
+                }
+                runCatching {
+                    val values = ContentValues().apply {
+                        put(DocumentsContract.Document.COLUMN_LAST_MODIFIED, System.currentTimeMillis())
+                    }
+                    appContext.contentResolver.update(recordFileUri, values, null, null)
                 }
                 notifyMediaScanner(recordFileUri)
                 Log.d("Repository", "Operational daily record updated: $fileName (${allDayRecords.size} total records)")

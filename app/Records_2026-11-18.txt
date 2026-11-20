@@ -1,6 +1,7 @@
 Sign-In Records for 18-11-2026 (Previous 24hrs)
-Generated at: 17:43:35 (Single daily file updated in place)
+Generated at: 07:38:00 (Single daily file updated in place)
 -----------------------------------------------------------------
 Name                      Role/Loc             Date         In       Out      Reg         
-Alice Smith               Director             19-11-2026   09:43    12:43    AB12 CDE    
-Bob Jones                 Cast                 18-11-2026   10:43    14:43    XY65 ZW     
+Alice Smith               Director             20-11-2026   09:38    12:38    AB12 CDE    
+Bob Jones                 Cast                 19-11-2026   10:38    14:38    XY65 ZW     
+Charlie Brown             Stage Crew           18-11-2026   11:38    15:38                
