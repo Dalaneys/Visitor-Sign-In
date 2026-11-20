@@ -2999,6 +2999,7 @@ object Repository {
                         val smtpPortVal = getCellValueAsString(batterySheet.getRow(5)?.getCell(1)).toIntOrNull() // Cell B6
                         val smtpUserVal = getCellValueAsString(batterySheet.getRow(6)?.getCell(1)) // Cell B7
                         val smtpPassVal = getCellValueAsString(batterySheet.getRow(7)?.getCell(1)) // Cell B8
+                        val logRetentionVal = getCellValueAsString(batterySheet.getRow(9)?.getCell(1)).toIntOrNull()?.coerceIn(0, 7) // Cell B10
 
                         updateSettings { it.copy(
                             batteryAdminLogLevel = adminLogLevel ?: it.batteryAdminLogLevel,
@@ -3007,7 +3008,8 @@ object Repository {
                             smtpHost = if (smtpHostVal.isNotBlank()) smtpHostVal else it.smtpHost,
                             smtpPort = smtpPortVal ?: it.smtpPort,
                             smtpUser = if (smtpUserVal.isNotBlank()) smtpUserVal else it.smtpUser,
-                            smtpPass = if (smtpPassVal.isNotBlank()) smtpPassVal else it.smtpPass
+                            smtpPass = if (smtpPassVal.isNotBlank()) smtpPassVal else it.smtpPass,
+                            batteryLogRetentionDays = logRetentionVal ?: it.batteryLogRetentionDays
                         ) }
                     }
 

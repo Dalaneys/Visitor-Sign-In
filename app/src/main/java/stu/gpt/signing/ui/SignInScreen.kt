@@ -1246,8 +1246,13 @@ fun MembersList(
             val availableSpaceForItems = totalHeight - (padding * 2) - (spacing * (mid - 1))
             val calculatedItemHeight = availableSpaceForItems / mid
 
-            // Auto-calculate tile height as ~4.8% of panel height, clamped between 40.dp and 60.dp
-            val dynamicMinTileHeight = (totalHeight * 0.048f).coerceIn(40.dp, 60.dp)
+            // Auto-calculate tile height, allowing up to 20 items per column to fit without scrolling
+            val maxItemsPerCol = maxOf(mid, members.size - mid)
+            val dynamicMinTileHeight = if (maxItemsPerCol <= 20) {
+                (totalHeight * 0.042f).coerceIn(34.dp, 60.dp)
+            } else {
+                (totalHeight * 0.048f).coerceIn(40.dp, 60.dp)
+            }
 
             val useScrolling = calculatedItemHeight < dynamicMinTileHeight
 

@@ -386,7 +386,6 @@ fun AdminScreen(
                 Spacer(Modifier.height(8.dp))
 
                 AdminTile(title = "Battery Monitoring", modifier = Modifier.fillMaxWidth()) {
-                    var retentionInput by remember { mutableStateOf(Repository.settings.batteryLogRetentionDays.toString()) }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             Text("Battery Monitoring", fontWeight = FontWeight.Medium, fontSize = 16.sp)
@@ -402,29 +401,24 @@ fun AdminScreen(
                         Spacer(Modifier.width(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
                             Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 8.dp)) {
-                                Text("Battery Logs to be refresh every days", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                Text("0-7 days (0 = Off)", fontSize = 10.sp, color = Color.Gray)
+                                Text("Battery Logs will be refresh in days", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text("Source: Battery.Cell(B10)", fontSize = 10.sp, color = Color.Gray)
                             }
-                            OutlinedTextField(
-                                value = retentionInput,
-                                onValueChange = { input ->
-                                    val filtered = input.filter { it.isDigit() }.take(1)
-                                    retentionInput = filtered
-                                    filtered.toIntOrNull()?.let { v ->
-                                        val clamped = v.coerceIn(0, 7)
-                                        Repository.updateSettings { s -> s.copy(batteryLogRetentionDays = clamped) }
-                                    }
-                                },
-                                singleLine = true,
-                                modifier = Modifier.width(70.dp).height(48.dp),
+                            Surface(
+                                color = Color(0xFFF0F0F0),
                                 shape = RoundedCornerShape(8.dp),
-                                textStyle = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = Color.White,
-                                    unfocusedContainerColor = Color.White
-                                ),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                            )
+                                border = BorderStroke(1.dp, Color.LightGray),
+                                modifier = Modifier.width(60.dp).height(48.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = Repository.settings.batteryLogRetentionDays.toString(),
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.DarkGray
+                                    )
+                                }
+                            }
                         }
                     }
                 }
