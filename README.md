@@ -1,4 +1,4 @@
-# Sign-In v5.0 – User & Technical Guide
+# Sign-In v5.1 – User & Technical Guide
 
 This guide explains how to use and maintain the Sign-In application.
 
@@ -26,6 +26,7 @@ This guide explains how to use and maintain the Sign-In application.
 - **[Lists & Sorting]**
   - **Guest Sorting:** Guest visitors are always pinned to the **top** of both Role and Location sections.
   - **Live Mode (With Cast):** Visitors are listed on the left (with a separating bar between Role and Youth/Location entries), and Cast is on the right.
+  - **Righthand Column Display (Cast List Panel):** When enabled in Admin, long cast lists (e.g., 39+ members) are organized into 2 side-by-side columns with abbreviated names (`First LastInitial.`). Tile height auto-scales dynamically (~4.8% of panel height, clamped between 40–60 dp, or down to 34 dp when fitting up to 20 members per side) so both sides show up to 20 members entirely without scrolling.
   - **Dark Mode / Meeting Mode:** When no cast list is loaded, or when Meeting mode is active, visitors are dynamically split across Left and Right panels based on the median alphabetical letter of the uploaded Members database (e.g., A-M and N-Z), displayed as `Members/Visitors (A-M)` and `Members/Visitors (N-Z)`. When Meeting mode is active, the header defaults to the default title (Titles cell B2).
 
 ---
@@ -48,7 +49,7 @@ This guide explains how to use and maintain the Sign-In application.
       - **Questions Worksheet (No header row):** Column B (Cells B1–B14: Last Person Sign-Out Checklist Text, Cells B15–B16: Reminder Pop-Up Message).
       - **Meetings Worksheet:** Column B (Cell B2: Theatre Meeting Duration Hours `1-24`, Cell B3: Warehouse Meeting Duration Hours `1-24`).
       - **Titles Worksheet:** Column B (Cell B2: Default Play Title / Main Header, Cell B3: Left Panel Heading, Cell B4: Right Panel Heading, Cell B5: Screen Saver Message).
-      - **Battery Worksheet:** Column B (Cell B2: Admin Log Level e.g. 30%, Cell B3: Email Sending Level e.g. 12%, Cell B4: Email Address Override, Cell B5: SMTP Host, Cell B6: SMTP Port, Cell B7: SMTP User, Cell B8: SMTP Pass).
+      - **Battery Worksheet:** Column B (Cell B2: Admin Log Level e.g., 30%, Cell B3: Email Sending Level e.g., 12%, Cell B4: Email Address Override, Cells B5–B8: SMTP Host, Port, User, Password, Cell B10: Battery Log Retention Days `0–7`).
   - **Modes (Loc'n 2 Enable & Meeting Mode):** In Admin under "Modes", toggle **Loc'n 2 Enable** or **Meeting Mode** (mutually exclusive).
     - In Loc'n 2 mode, active Locations and Roles are loaded automatically from Cells A21:A30 of the Locations/Roles worksheets. The main screen push button cycles through 3 steps: **🎭 #1** (0) ➔ **🎭 #2** (1) ➔ **👥 Meeting** (2, with groups icon and bright blue background).
     - In Normal mode, active Locations and Roles are loaded from Cells A2:A20. Toggling Meeting mode displays the meeting push button (Off state is 2 shades lighter than On state).
@@ -66,8 +67,9 @@ This guide explains how to use and maintain the Sign-In application.
   - **Log Save Folder Subfolders:** All external files are organized into dedicated subfolders:
     - **`Records/Records_YYYY-MM-DD.txt`**: Daily attendance records for the operational 24-hour day (04:01 AM to 04:00 AM next day).
     - **`Admin Logs/Admin_logs_YYYY-MM-DD.txt`**: System and administrative event logs.
+    - **`Admin Logs/Battery_YYYY-MM-DD.txt`**: Hourly battery status logs featuring visual ASCII progress bars (`[██████████          ] 50%`).
   - **Log File Retention & Storage:** 
-    - **Retention**: Admin logs and sign-in records are retained for **30 days** (older files are pruned).
+    - **Retention**: Admin logs and sign-in records are retained for **30 days** (older files are pruned). Battery logs are retained according to **Battery.Cell(B10)** (`0–7` days, default `3`). If set to `0`, logging is disabled and a daily `"Battery Level Monitoring off"` message is logged.
     - **Storage Consumption:** Extremely lightweight, consuming **less than 20 MB total**.
   - **Unselected Log Folder Behavior:** If no log save folder is selected, core sign-in, database loading/saving, and local in-app history operate normally; external text log files and daily export files are simply skipped until a folder is designated.
   - **Display Over Other Apps (Auto-Start):** Required for automatic startup over the lock screen. If grayed out on Android 11+, tap the top-right three dots (`⋮`) and select **"Allow restricted settings"** first.
@@ -76,19 +78,20 @@ This guide explains how to use and maintain the Sign-In application.
 
 ## Battery Monitoring System & Email Test
 
-Sign-In v5.0 features a robust, automated battery monitoring system designed to protect continuous-operation sign-in tablets from unexpected shutdowns.
+Sign-In v5.1 features a robust, automated battery monitoring system designed to protect continuous-operation sign-in tablets from unexpected shutdowns.
 
 - **Real-Time Monitoring:** Uses Android's `BroadcastReceiver` (`Intent.ACTION_BATTERY_CHANGED`) to track percentage (`0–100%`) and charging state in real time.
 - **Admin Control & Settings Workbook Integration:**
-  - Can be toggled on/off in Admin under **Battery Monitoring**.
-  - Configurable via the **'Battery' worksheet in the Settings Excel workbook** (Cell B2: Admin Log Level e.g., 30%, Cell B3: Email Sending Level e.g., 12%, Cell B4: Email Address Override, Cells B5–B8: SMTP Host, Port, User, Password).
-- **Severity Alert Tiers (When Running on Battery / `!isPluggedIn`):**
-  - **Level 1 (Admin Log Warning / Battery ≤ Admin Level, e.g., 30%):** Logs a warning in Logcat (`SignInBattery`) and records an Admin Event log (`Repository.logAdminEvent`) reporting hourly battery status (throttled to at least 1-hour intervals).
+  - Can be toggled on/off in Admin under **Battery Monitoring** (with retention days loaded read-only from **Battery.Cell(B10)**).
+  - Configurable via the **'Battery' worksheet in the Settings Excel workbook** (Cell B2: Admin Log Level e.g., 30%, Cell B3: Email Sending Level e.g., 12%, Cell B4: Email Address Override, Cell B10: Battery Log Retention Days `0–7`, Cells B5–B8: SMTP Host, Port, User, Password).
+- **Severity Alert Tiers (Running on Battery / `!isPluggedIn`):**
+  - **Level 1 (Admin Log Warning / Battery ≤ Admin Level, e.g., 30%):** Logs a warning in Logcat (`SignInBattery`) and records an Admin Event log (`Repository.logAdminEvent`).
   - **Level 2 (Critical Threshold / Battery ≤ Admin Level - 10, e.g., 20%):** Displays a light yellow warning banner (`BatteryStatusBanner`, `Color(0xFFFFF9C4)`) reading `"Battery Level at [X]% - Check Connections"`.
   - **Level 3 (Critical Email Level / Battery ≤ Email Level, e.g., 12%):** Displays a bright yellow banner with red border and bold red text (`Color(0xFFFED101)`) reading `"Battery Level at [X]% - Check Connections, Tech Contacted"` and automatically dispatches a high-priority critical SMTP email warning (`Repository.sendBackgroundEmail`, `X-Priority: 1`, `Importance: High`) to the designated recipient.
+- **Hourly Battery Logging:** Every hour, the app records the battery percentage, charge status, and a visual ASCII graph into `Battery_YYYY-MM-DD.txt`.
 - **Email Test Button in Admin:** Tap the yellow **EMAIL TEST** button in the Admin footer to immediately send a high-priority test email using Cell B4 and SMTP configuration from the **Settings** workbook.
 - **Charging Reset:** When the tablet is plugged in (`isPluggedIn == true`), all warning banners are hidden and internal triggers reset automatically.
-- **OEM Battery Optimization Note:** On certain tablets (Samsung, Lenovo, etc.), OEM background managers may terminate apps. Go to **Settings > Apps > Sign-In v5.0 > Battery**, set it to **"Unrestricted"**, and enable **Auto-start / Allow background activity**.
+- **OEM Battery Optimization Note:** On certain tablets (Samsung, Lenovo, etc.), OEM background managers may terminate apps. Go to **Settings > Apps > Sign-In v5.1 > Battery**, set it to **"Unrestricted"**, and enable **Auto-start / Allow background activity**.
 
 ---
 
@@ -98,4 +101,4 @@ Sign-In v5.0 features a robust, automated battery monitoring system designed to 
 - **Architecture:** `Repository.kt` as Single Source of Truth.
 - **Persistence:** All databases are persisted locally in JSON format to ensure offline availability.
 - **Excel Processing:** Powered by **Apache POI**. All data files are expected in Documents.
-- **Footer Branding:** Created by Stu Sorrell, v5.0.2026.11
+- **Footer Branding:** Created by Stu Sorrell, v5.1.2026.11

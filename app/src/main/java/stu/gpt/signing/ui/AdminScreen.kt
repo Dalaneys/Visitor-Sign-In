@@ -349,7 +349,7 @@ fun AdminScreen(
                     }
                     AdminTile(title = "Modes", modifier = Modifier.weight(1f).fillMaxHeight()) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Text("Loc'n 2 Enable", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                            Text("2nd Location", fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.weight(1f))
                             Switch(
                                 checked = Repository.settings.warehouseModeEnabled,
                                 enabled = !Repository.settings.meetingModeEnabled,
@@ -367,7 +367,7 @@ fun AdminScreen(
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Meeting Mode", fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                                Text("Loc'n 1: ${settings.theatreMeetingDurationHours}h\nLoc'n 2: ${settings.warehouseMeetingDurationHours}h", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                Text("Location 1: ${settings.theatreMeetingDurationHours}h\nLocation 2: ${settings.warehouseMeetingDurationHours}h", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                             }
                             Switch(
                                 checked = Repository.settings.meetingModeEnabled,
