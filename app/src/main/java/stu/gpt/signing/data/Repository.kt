@@ -593,7 +593,7 @@ object Repository {
                     val treeId = DocumentsContract.getTreeDocumentId(treeUri)
                     val parentDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId)
 
-                    var adminLogsFolderUri: Uri? = null
+                    var batteryFolderUri: Uri? = null
                     val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, treeId)
                     appContext.contentResolver.query(
                         childrenUri,
@@ -605,27 +605,27 @@ object Repository {
                         val mimeCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
                         if (idCol >= 0 && nameCol >= 0) {
                             while (cursor.moveToNext()) {
-                                if (cursor.getString(nameCol) == "Admin Logs" && cursor.getString(mimeCol) == DocumentsContract.Document.MIME_TYPE_DIR) {
+                                if (cursor.getString(nameCol) == "Battery" && cursor.getString(mimeCol) == DocumentsContract.Document.MIME_TYPE_DIR) {
                                     val docId = cursor.getString(idCol)
-                                    adminLogsFolderUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                                    batteryFolderUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
                                     break
                                 }
                             }
                         }
                     }
 
-                    if (adminLogsFolderUri == null) {
-                        adminLogsFolderUri = DocumentsContract.createDocument(appContext.contentResolver, parentDocUri, DocumentsContract.Document.MIME_TYPE_DIR, "Admin Logs")
+                    if (batteryFolderUri == null) {
+                        batteryFolderUri = DocumentsContract.createDocument(appContext.contentResolver, parentDocUri, DocumentsContract.Document.MIME_TYPE_DIR, "Battery")
                     }
 
-                    if (adminLogsFolderUri == null) return@synchronized
+                    if (batteryFolderUri == null) return@synchronized
 
-                    val adminLogsDocId = DocumentsContract.getDocumentId(adminLogsFolderUri!!)
-                    val adminLogsChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, adminLogsDocId)
+                    val batteryDocId = DocumentsContract.getDocumentId(batteryFolderUri!!)
+                    val batteryChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, batteryDocId)
 
                     var fileUri: Uri? = null
                     appContext.contentResolver.query(
-                        adminLogsChildrenUri,
+                        batteryChildrenUri,
                         arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME),
                         null, null, null
                     )?.use { cursor ->
@@ -643,7 +643,7 @@ object Repository {
                     }
 
                     if (fileUri == null) {
-                        fileUri = DocumentsContract.createDocument(appContext.contentResolver, adminLogsFolderUri!!, "text/plain", targetFileName)
+                        fileUri = DocumentsContract.createDocument(appContext.contentResolver, batteryFolderUri!!, "text/plain", targetFileName)
                     }
 
                     if (fileUri != null) {
@@ -685,24 +685,24 @@ object Repository {
             val parentUri = Uri.parse(uriStr)
             val parentId = DocumentsContract.getTreeDocumentId(parentUri)
             
-            var adminLogsFolderId: String? = null
+            var batteryFolderId: String? = null
             val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, parentId)
             appContext.contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { cursor ->
                 val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
                 val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
                 val mimeCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
                 while (cursor.moveToNext()) {
-                    if (cursor.getString(nameCol) == "Admin Logs" && cursor.getString(mimeCol) == DocumentsContract.Document.MIME_TYPE_DIR) {
-                        adminLogsFolderId = cursor.getString(idCol)
+                    if (cursor.getString(nameCol) == "Battery" && cursor.getString(mimeCol) == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        batteryFolderId = cursor.getString(idCol)
                         break
                     }
                 }
             }
 
-            if (adminLogsFolderId == null) return
+            if (batteryFolderId == null) return
 
-            val adminLogsChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, adminLogsFolderId)
-            appContext.contentResolver.query(adminLogsChildrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
+            val batteryChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, batteryFolderId)
+            appContext.contentResolver.query(batteryChildrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
                 val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
                 val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
                 while (cursor.moveToNext()) {
